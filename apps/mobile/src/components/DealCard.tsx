@@ -1,13 +1,7 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Deal } from "../api/types";
 import { AIRLINE_NAMES } from "../api/client";
-
-const BADGE: Record<string, { label: string; color: string }> = {
-  cheap: { label: "💰 便宜票", color: "#0a7d2c" },
-  error_fare: { label: "🐞 疑似BUG票", color: "#b3261e" },
-  nested: { label: "🧩 構票", color: "#5b4b8a" },
-};
 
 function flightInfoLine(deal: Deal): string | null {
   const parts: string[] = [];
@@ -21,23 +15,38 @@ function flightInfoLine(deal: Deal): string | null {
 }
 
 export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () => void }) {
-  const badge = BADGE[deal.type] ?? { label: "✈️ 好康", color: "#333" };
+  const isBug = deal.type === "error_fare";
   const flightInfo = flightInfoLine(deal);
+  const route = deal.route_str.replace("->", " → ");
+  const pct = Math.round(deal.discount_pct * 100);
+  const median = Math.round(deal.baseline_median).toLocaleString();
+  const hint = isBug
+    ? `比平常低 ${pct}% · 航司不保證出票，訂票風險自負`
+    : `這條航線平常約 ${median}${deal.tier === "strong" ? " · 難得低價" : ""}`;
+
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={[styles.card, isBug && styles.cardBug]} onPress={onPress}>
       <View style={styles.row}>
-        <Text style={[styles.badge, { color: badge.color }]}>{badge.label}</Text>
-        <Text style={styles.route}>{deal.route_str}</Text>
+        <Text style={[styles.route, isBug && styles.textBug]}>{route}</Text>
+        <View style={[styles.pill, isBug ? styles.pillBug : styles.pillGood]}>
+          <Text style={[styles.pillText, isBug ? styles.pillTextBug : styles.pillTextGood]}>
+            {isBug ? "疑似標錯價" : `比平常低 ${pct}%`}
+          </Text>
+        </View>
       </View>
-      <Text style={styles.price}>
-        {deal.price.toLocaleString()} {deal.currency}
-        <Text style={styles.off}>　比平常低 {Math.round(deal.discount_pct * 100)}%</Text>
+      <Text style={[styles.price, isBug && styles.textBug]}>
+        {deal.price.toLocaleString()} <Text style={styles.currency}>{deal.currency}</Text>
       </Text>
-      {flightInfo ? <Text style={styles.sub}>{flightInfo}</Text> : null}
-      <Text style={styles.sub}>
-        基準 {Math.round(deal.baseline_median).toLocaleString()} · {deal.tier}
-        {deal.needs_verification ? " · ⚠️需複核" : ""}
-      </Text>
+      {flightInfo ? <Text style={[styles.sub, isBug && styles.subBug]}>✈ {flightInfo}</Text> : null}
+      <Text style={[styles.hint, isBug && styles.subBug]}>{hint}</Text>
+      {deal.deep_link ? (
+        <Pressable
+          style={[styles.button, isBug && styles.buttonBug]}
+          onPress={() => Linking.openURL(deal.deep_link as string)}
+        >
+          <Text style={styles.buttonText}>{isBug ? "前往 Trip.com 查看 ↗" : "前往 Trip.com 訂票 ↗"}</Text>
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -49,16 +58,31 @@ const styles = StyleSheet.create({
     padding: 14,
     marginHorizontal: 12,
     marginVertical: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#e8e8e8",
   },
+  cardBug: { backgroundColor: "#FCEBEB", borderColor: "#F7C1C1" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  badge: { fontSize: 13, fontWeight: "600" },
-  route: { fontSize: 15, fontWeight: "700", color: "#111" },
-  price: { fontSize: 20, fontWeight: "800", color: "#111", marginTop: 6 },
-  off: { fontSize: 14, fontWeight: "700", color: "#0a7d2c" },
-  sub: { fontSize: 12, color: "#666", marginTop: 4 },
+  route: { fontSize: 16, fontWeight: "700", color: "#111" },
+  textBug: { color: "#A32D2D" },
+  pill: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
+  pillGood: { backgroundColor: "#E1F5EE" },
+  pillBug: { backgroundColor: "#fff" },
+  pillText: { fontSize: 12, fontWeight: "600" },
+  pillTextGood: { color: "#0F6E56" },
+  pillTextBug: { color: "#A32D2D" },
+  price: { fontSize: 24, fontWeight: "800", color: "#111", marginTop: 6 },
+  currency: { fontSize: 13, fontWeight: "600", color: "#999" },
+  sub: { fontSize: 13, color: "#555", marginTop: 4 },
+  subBug: { color: "#A32D2D" },
+  hint: { fontSize: 12, color: "#999", marginTop: 3 },
+  button: {
+    marginTop: 10,
+    backgroundColor: "#111",
+    borderRadius: 8,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  buttonBug: { backgroundColor: "#A32D2D" },
+  buttonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });

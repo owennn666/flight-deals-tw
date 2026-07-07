@@ -101,6 +101,7 @@ export default function DealsScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.subtitle}>跟這條航線平常的價格比，真的變便宜才列出</Text>
       <View style={styles.filters}>
         {FILTERS.map((f) => (
           <Pressable key={f.label} onPress={() => setFilter(f.key)}>
@@ -197,6 +198,7 @@ export default function DealsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f2f3f5" },
+  subtitle: { fontSize: 12, color: "#888", paddingHorizontal: 12, paddingTop: 10, backgroundColor: "#fff" },
   filters: { flexDirection: "row", gap: 8, padding: 12, backgroundColor: "#fff", flexWrap: "wrap" },
   filter: {
     fontSize: 14,
