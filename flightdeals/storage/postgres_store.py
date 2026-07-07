@@ -14,6 +14,7 @@ from typing import Optional
 from ..models import Baseline
 from ..stats import mad as _mad
 from ..stats import median as _median
+from ..stats import percentile as _percentile
 from .base import PriceStore
 
 
@@ -30,13 +31,13 @@ class PostgresStore(PriceStore):
     def add_prices(self, prices):
         rows = [
             (p.route.origin, p.route.destination, p.price, p.currency,
-             p.cabin.value, p.depart_date, p.source, p.observed_at)
+             p.cabin.value, p.depart_date, p.source, p.observed_at, p.airline)
             for p in prices
         ]
         with self._conn.cursor() as cur:
             cur.executemany(
-                "insert into prices(origin,destination,price,currency,cabin,depart_date,source,observed_at)"
-                " values (%s,%s,%s,%s,%s,%s,%s,%s)",
+                "insert into prices(origin,destination,price,currency,cabin,depart_date,source,observed_at,airline)"
+                " values (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 rows,
             )
 
@@ -48,10 +49,17 @@ class PostgresStore(PriceStore):
                 (route.origin, route.destination, since),
             )
             xs = [r[0] for r in cur.fetchall()]
-        if len(xs) < 3:
+        if len(xs) < 20:
             return None
         m = _median(xs)
-        return Baseline(route=route, median=m, mad=_mad(xs, m), sample_size=len(xs))
+        return Baseline(
+            route=route,
+            median=m,
+            mad=_mad(xs, m),
+            sample_size=len(xs),
+            p10=_percentile(xs, 0.10),
+            p05=_percentile(xs, 0.05),
+        )
 
     def seen_deal(self, key):
         with self._conn.cursor() as cur:
@@ -69,9 +77,10 @@ class PostgresStore(PriceStore):
                 insert into deals
                   (type, route_str, origin, destination, price, currency, cabin,
                    depart_date, return_date, baseline_median, discount_pct, tier,
-                   needs_verification, reasons, deep_link, source, dedupe_key)
+                   needs_verification, reasons, deep_link, source,
+                   airline, flight_number, transfers, depart_time, dedupe_key)
                 values
-                  (%s,%s,%s,%s,%s,%s,%s,%s::date,%s::date,%s,%s,%s,%s,%s::jsonb,%s,%s,%s)
+                  (%s,%s,%s,%s,%s,%s,%s,%s::date,%s::date,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s,%s,%s)
                 on conflict (dedupe_key) do nothing
                 returning id
                 """,
@@ -79,7 +88,9 @@ class PostgresStore(PriceStore):
                     d["type"], d["route_str"], d["route"]["origin"], d["route"]["destination"],
                     d["price"], d["currency"], d["cabin"], d.get("depart_date"), d.get("return_date"),
                     d["baseline_median"], d["discount_pct"], d["tier"], d["needs_verification"],
-                    json.dumps(d["reasons"]), d.get("deep_link"), d.get("source"), d["dedupe_key"],
+                    json.dumps(d["reasons"]), d.get("deep_link"), d.get("source"),
+                    d.get("airline"), d.get("flight_number"), d.get("transfers"), d.get("depart_time"),
+                    d["dedupe_key"],
                 ),
             )
             row = cur.fetchone()
@@ -88,7 +99,7 @@ class PostgresStore(PriceStore):
     def recent_deals(self, limit=50, deal_type=None):
         q = ("select id, created_at, type, route_str, origin, destination, price, currency, cabin,"
              " depart_date, return_date, baseline_median, discount_pct, tier, needs_verification,"
-             " reasons, deep_link, source from deals")
+             " reasons, deep_link, source, airline, flight_number, transfers, depart_time from deals")
         args: list = []
         if deal_type:
             q += " where type=%s"

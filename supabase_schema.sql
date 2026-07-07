@@ -11,7 +11,8 @@ create table if not exists public.prices (
   cabin       text,
   depart_date date,
   source      text,
-  observed_at timestamptz default now()
+  observed_at timestamptz default now(),
+  airline     text
 );
 create index if not exists idx_prices_route on public.prices (origin, destination, observed_at);
 
@@ -35,6 +36,10 @@ create table if not exists public.deals (
   reasons            jsonb,
   deep_link          text,
   source             text,
+  airline            text,
+  flight_number      text,
+  transfers          int,
+  depart_time        text,
   dedupe_key         text unique
 );
 create index if not exists idx_deals_id on public.deals (id desc);

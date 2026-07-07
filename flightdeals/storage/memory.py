@@ -8,6 +8,7 @@ from typing import Optional
 from ..models import Baseline, FarePrice, Route
 from ..stats import mad as _mad
 from ..stats import median as _median
+from ..stats import percentile as _percentile
 from .base import PriceStore
 
 
@@ -26,10 +27,17 @@ class InMemoryStore(PriceStore):
 
     def baseline(self, route, window_days=90):
         xs = self._prices.get(route, [])
-        if len(xs) < 3:
+        if len(xs) < 20:
             return None
         med = _median(xs)
-        return Baseline(route=route, median=med, mad=_mad(xs, med), sample_size=len(xs))
+        return Baseline(
+            route=route,
+            median=med,
+            mad=_mad(xs, med),
+            sample_size=len(xs),
+            p10=_percentile(xs, 0.10),
+            p05=_percentile(xs, 0.05),
+        )
 
     def seen_deal(self, key):
         return key in self._seen

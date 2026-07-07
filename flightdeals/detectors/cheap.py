@@ -1,4 +1,9 @@
-"""異常便宜票偵測：低於基準線一定比例即成局（誤報成本低，可自動推播）。"""
+"""異常便宜票偵測：跟這條航線自己的歷史價分位數比，跌破歷史低價才成局。
+
+方案 C：不跟「混合廉航+傳統航空」的中位數比（廉航結構性便宜、正常價也會
+天然低於混合中位數，形成循環邏輯），改跟航線自己的歷史 p10/p05 比，對齊
+Google Flights / Hopper 的「跟航線歷史比」邏輯。
+"""
 from __future__ import annotations
 
 from typing import Optional
@@ -11,10 +16,10 @@ from .base import Detector
 class CheapFareDetector(Detector):
     deal_type = DealType.CHEAP
 
-    def __init__(self, threshold: float = 0.25, strong: float = 0.40):
-        # threshold：便宜多少才算好康；strong：便宜多少算「強力推薦」
-        self.threshold = threshold
-        self.strong = strong
+    def __init__(self, **_):
+        # 不再吃 threshold/strong：門檻改為固定的歷史分位數（p10/p05）。
+        # **_ 吞掉任何殘留的 config 參數，避免舊 config 沒清乾淨時炸掉。
+        pass
 
     def evaluate(self, fare, baseline):
         if baseline is None or not baseline.is_reliable:
@@ -22,10 +27,10 @@ class CheapFareDetector(Detector):
         med = baseline.median
         if med <= 0:
             return None
-        discount = (med - fare.price) / med
-        if discount < self.threshold:
-            return None
-        tier = "strong" if discount >= self.strong else "good"
+        if fare.price >= baseline.p10:
+            return None  # 沒跌破航線歷史地板，不夠便宜
+        tier = "strong" if fare.price < baseline.p05 else "good"
+        discount = max(0.0, (med - fare.price) / med)  # 僅作顯示用
         return Deal(
             fare=fare,
             deal_type=self.deal_type,
@@ -33,5 +38,5 @@ class CheapFareDetector(Detector):
             discount_pct=discount,
             score=robust_z(fare.price, med, baseline.mad),
             tier=tier,
-            reasons=[f"比基準線便宜 {discount * 100:.0f}%（基準 {med:.0f} {fare.currency}）"],
+            reasons=[f"比這條航線平常便宜 {discount * 100:.0f}%（平常約 {med:.0f} {fare.currency}）"],
         )

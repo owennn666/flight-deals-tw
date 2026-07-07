@@ -27,7 +27,6 @@ store:
 
 detectors:
   - name: cheap
-    params: { threshold: 0.25, strong: 0.40 }
   - name: error_fare
     params: { threshold: 0.70 }
 

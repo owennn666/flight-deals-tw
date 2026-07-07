@@ -37,6 +37,10 @@ class FarePrice:
     observed_at: datetime = field(default_factory=datetime.utcnow)
     deep_link: Optional[str] = None          # 訂票（聯盟）連結
     raw: dict = field(default_factory=dict)  # 原始回應，除錯用
+    airline: Optional[str] = None            # 航空公司代碼，例：JX
+    flight_number: Optional[str] = None      # 航班號，例："395"
+    transfers: Optional[int] = None          # 轉機次數，0 = 直飛
+    depart_time: Optional[str] = None        # 出發當地時間 "HH:MM"
 
 
 @dataclass
@@ -47,11 +51,13 @@ class Baseline:
     mad: float                 # median absolute deviation，抗離群值的離散度
     sample_size: int
     currency: str = "TWD"
+    p10: float = 0.0            # 第 10 百分位價格（歷史地板附近）
+    p05: float = 0.0            # 第 5 百分位價格（極端歷史低價）
 
     @property
     def is_reliable(self) -> bool:
-        """樣本太少的基準線不可信，避免暖機期誤報。"""
-        return self.sample_size >= 8
+        """樣本太少的基準線不可信；分位數統計需要更多樣本才有意義。"""
+        return self.sample_size >= 20
 
 
 class DealType(str, Enum):

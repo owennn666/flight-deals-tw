@@ -36,6 +36,16 @@ def _parse_dt(s: Optional[str]) -> Optional[date]:
             return None
 
 
+def _parse_time(s: Optional[str]) -> Optional[str]:
+    """從 ISO 時間字串（如 "2026-08-20T08:15:00+07:00"）取出當地時間 "HH:MM"。"""
+    if not s:
+        return None
+    t = s[11:16]
+    if len(t) == 5 and t[2] == ":" and t[:2].isdigit() and t[3:].isdigit():
+        return t
+    return None
+
+
 class TravelpayoutsSource(DataSource):
     name = "travelpayouts"
     BASE = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
@@ -89,6 +99,7 @@ class TravelpayoutsSource(DataSource):
                 continue
             depart = _parse_dt(item.get("departure_at"))
             ret = _parse_dt(item.get("return_at"))
+            flight_number = item.get("flight_number")
             offers.append(
                 FarePrice(
                     route=route,
@@ -100,6 +111,12 @@ class TravelpayoutsSource(DataSource):
                     source=self.name,
                     deep_link=self._trip_link(route, depart, ret),
                     raw=item,
+                    airline=item.get("airline"),
+                    flight_number=(
+                        str(flight_number) if flight_number is not None else None
+                    ),
+                    transfers=item.get("transfers"),
+                    depart_time=_parse_time(item.get("departure_at")),
                 )
             )
         return offers

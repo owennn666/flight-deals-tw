@@ -10,6 +10,7 @@ SAMPLE = {
     "data": [
         {
             "origin": "TPE", "destination": "NRT", "price": 8200, "airline": "JX",
+            "flight_number": 395,
             "departure_at": "2026-08-15T10:00:00+08:00",
             "return_at": "2026-08-22T18:00:00+09:00",
             "transfers": 0, "link": "/search/TPE1508NRT2208",
@@ -48,6 +49,17 @@ def test_parse_v3_prices():
     dl1 = offers[1].deep_link
     assert "ddate=2026-09-01" in dl1 and "triptype=ow" in dl1
     assert "rdate=" not in dl1
+
+    # 航空公司 / 航班號 / 轉機 / 出發時間
+    assert offers[0].airline == "JX"
+    assert offers[0].flight_number == "395"  # int 395 轉字串
+    assert offers[0].transfers == 0
+    assert offers[0].depart_time == "10:00"
+
+    assert offers[1].airline == "BR"
+    assert offers[1].flight_number is None  # SAMPLE 第二筆無 flight_number
+    assert offers[1].transfers is None  # SAMPLE 第二筆無 transfers
+    assert offers[1].depart_time == "09:00"
 
 
 def test_missing_token_raises():

@@ -27,10 +27,7 @@ store:
     path: flightdeals.db
 
 detectors:
-  - name: cheap
-    params:
-      threshold: 0.25   # 便宜 25% 起算好康
-      strong: 0.40      # 便宜 40% 標記強力推薦
+  - name: cheap        # 跟航線自己的歷史價分位數比（跌破 p10 才成局），無 params 可調
   - name: error_fare
     params:
       threshold: 0.70   # 便宜 70% 起算疑似標錯價（需人工複核）

@@ -25,3 +25,21 @@ def robust_z(x: float, med: float, mad_val: float) -> float:
     if mad_val <= 0:
         return 0.0
     return 0.6745 * (med - x) / mad_val
+
+
+def percentile(xs: Sequence[float], q: float) -> float:
+    """第 q 分位數（q∈[0,1]），排序後線性插值。
+
+    空序列回 0.0；單元素回該值。
+    """
+    if not xs:
+        return 0.0
+    s = sorted(xs)
+    n = len(s)
+    if n == 1:
+        return s[0]
+    pos = q * (n - 1)
+    lo = int(pos)
+    hi = min(lo + 1, n - 1)
+    frac = pos - lo
+    return s[lo] + (s[hi] - s[lo]) * frac

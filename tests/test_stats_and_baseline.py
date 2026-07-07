@@ -1,6 +1,6 @@
 """基準線與統計的單元測試（純函式、可重現）。"""
 from flightdeals.models import Cabin, FarePrice, Route
-from flightdeals.stats import mad, median, robust_z
+from flightdeals.stats import mad, median, percentile, robust_z
 from flightdeals.storage.memory import InMemoryStore
 
 
@@ -17,20 +17,54 @@ def test_robust_z_sign():
     assert robust_z(10000, 10000, 0) == 0  # mad=0 不除零
 
 
+def test_percentile_basic():
+    xs = [10, 20, 30, 40, 50]  # n=5, pos = q*4
+    assert percentile(xs, 0.0) == 10
+    assert percentile(xs, 1.0) == 50
+    assert percentile(xs, 0.5) == 30
+    assert percentile(xs, 0.25) == 20  # pos=1.0 → 剛好第2個
+
+
+def test_percentile_interpolates():
+    xs = [10, 20, 30, 40]  # n=4, pos = q*3
+    # q=0.1 → pos=0.3 → 10 + 0.3*(20-10) = 13
+    assert percentile(xs, 0.1) == 13
+
+
+def test_percentile_edge_cases():
+    assert percentile([], 0.5) == 0.0
+    assert percentile([42], 0.1) == 42
+    assert percentile([42], 0.9) == 42
+
+
 def test_baseline_needs_min_samples():
     store = InMemoryStore()
     r = Route("TPE", "NRT")
-    store.add_prices([FarePrice(route=r, price=12000, cabin=Cabin.ECONOMY)])
-    # 少於 3 筆 → 無基準線
+    store.add_prices([FarePrice(route=r, price=12000, cabin=Cabin.ECONOMY) for _ in range(19)])
+    # 少於 20 筆 → 無基準線（分位數需要足夠樣本才可信）
     assert store.baseline(r) is None
 
 
 def test_baseline_reliability_threshold():
     store = InMemoryStore()
     r = Route("TPE", "NRT")
-    store.add_prices([FarePrice(route=r, price=12000) for _ in range(10)])
+    store.add_prices([FarePrice(route=r, price=12000) for _ in range(20)])
     b = store.baseline(r)
     assert b is not None
-    assert b.sample_size == 10
+    assert b.sample_size == 20
     assert b.is_reliable is True
     assert b.median == 12000
+
+
+def test_baseline_has_percentiles():
+    store = InMemoryStore()
+    r = Route("TPE", "BKK")
+    # 25 筆，其中 20 筆是 6000（廉航常態價）、5 筆是 3800（歷史特價）
+    prices = [6000] * 20 + [3800] * 5
+    store.add_prices([FarePrice(route=r, price=p) for p in prices])
+    b = store.baseline(r)
+    assert b is not None
+    assert b.sample_size == 25
+    # p10/p05 應落在歷史特價附近，而不是等於混合中位數
+    assert b.p10 < b.median
+    assert b.p05 <= b.p10
