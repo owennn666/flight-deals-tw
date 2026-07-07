@@ -34,11 +34,59 @@ const ROUTES: RouteInfo[] = (
   [["TPE", "NRT"], ["TPE", "KIX"], ["TPE", "ICN"], ["TPE", "BKK"], ["TPE", "DAD"], ["TPE", "CDG"], ["TPE", "LHR"]] as const
 ).map(([o, d]) => ({ origin: o, destination: d, label: `${o}→${d}` }));
 
+// 廉航 IATA 代碼白名單（「隱藏廉航」篩選用；null/查不到的一律視為非廉航）
+export const LCC_AIRLINES: string[] = [
+  "SL", "FD", "AK", "D7", "TR", "IT", "VZ", "JW", "XJ", "JQ",
+  "5J", "Z2", "DD", "JT", "QZ", "TW", "LJ", "BX", "ZE", "GK", "MM",
+];
+
+// 航空公司 IATA 代碼 → 中文名（查不到顯示原代碼）
+export const AIRLINE_NAMES: Record<string, string> = {
+  SL: "泰國獅航",
+  FD: "泰國亞航",
+  AK: "亞航",
+  D7: "亞航X",
+  TR: "酷航",
+  IT: "台灣虎航",
+  VZ: "泰越捷",
+  JX: "星宇航空",
+  BR: "長榮航空",
+  CI: "中華航空",
+  NH: "全日空",
+  JL: "日本航空",
+  KE: "大韓航空",
+  OZ: "韓亞航空",
+  TG: "泰航",
+  SQ: "新航",
+  CX: "國泰",
+  MU: "東方航空",
+  CA: "國航",
+  VN: "越航",
+  PR: "菲航",
+  "5J": "宿霧太平洋",
+  JQ: "捷星",
+};
+
+export interface DealsQuery {
+  type?: string;
+  origin?: string;
+  destination?: string;
+  minDiscount?: number;
+  maxPrice?: number;
+  limit?: number;
+}
+
 export const api = {
   routes: async (): Promise<RouteInfo[]> => ROUTES,
 
-  deals: async (type?: string, limit = 50): Promise<Deal[]> => {
-    const filter = type ? `&type=eq.${encodeURIComponent(type)}` : "";
+  deals: async (opts?: DealsQuery): Promise<Deal[]> => {
+    const { type, origin, destination, minDiscount, maxPrice, limit = 50 } = opts ?? {};
+    let filter = "";
+    if (type) filter += `&type=eq.${encodeURIComponent(type)}`;
+    if (origin) filter += `&origin=eq.${encodeURIComponent(origin)}`;
+    if (destination) filter += `&destination=eq.${encodeURIComponent(destination)}`;
+    if (minDiscount !== undefined) filter += `&discount_pct=gte.${minDiscount}`;
+    if (maxPrice !== undefined) filter += `&price=lte.${maxPrice}`;
     const rows = await rest<DealRow[]>(`/deals?select=*&order=id.desc&limit=${limit}${filter}`);
     return (rows ?? []).map(toDeal);
   },

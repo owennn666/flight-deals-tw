@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Deal } from "../api/types";
+import { AIRLINE_NAMES } from "../api/client";
 
 const BADGE: Record<string, { label: string; color: string }> = {
   cheap: { label: "💰 便宜票", color: "#0a7d2c" },
@@ -8,8 +9,20 @@ const BADGE: Record<string, { label: string; color: string }> = {
   nested: { label: "🧩 構票", color: "#5b4b8a" },
 };
 
+function flightInfoLine(deal: Deal): string | null {
+  const parts: string[] = [];
+  if (deal.airline) parts.push(`${AIRLINE_NAMES[deal.airline] ?? deal.airline}${deal.flight_number ? ` ${deal.flight_number}` : ""}`);
+  else if (deal.flight_number) parts.push(deal.flight_number);
+  if (deal.depart_time) parts.push(deal.depart_time);
+  if (deal.transfers !== undefined && deal.transfers !== null) {
+    parts.push(deal.transfers === 0 ? "直飛" : `轉${deal.transfers}次`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () => void }) {
   const badge = BADGE[deal.type] ?? { label: "✈️ 好康", color: "#333" };
+  const flightInfo = flightInfoLine(deal);
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.row}>
@@ -18,8 +31,9 @@ export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () =>
       </View>
       <Text style={styles.price}>
         {deal.price.toLocaleString()} {deal.currency}
-        <Text style={styles.off}>　省 {Math.round(deal.discount_pct * 100)}%</Text>
+        <Text style={styles.off}>　比平常低 {Math.round(deal.discount_pct * 100)}%</Text>
       </Text>
+      {flightInfo ? <Text style={styles.sub}>{flightInfo}</Text> : null}
       <Text style={styles.sub}>
         基準 {Math.round(deal.baseline_median).toLocaleString()} · {deal.tier}
         {deal.needs_verification ? " · ⚠️需複核" : ""}

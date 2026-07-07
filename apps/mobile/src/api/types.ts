@@ -20,6 +20,10 @@ export interface Deal {
   reasons: string[];
   deep_link: string | null;
   source: string;
+  airline?: string | null;
+  flight_number?: string | null;
+  depart_time?: string | null; // "HH:MM"
+  transfers?: number | null; // 0=直飛
 }
 
 export interface RouteInfo {
