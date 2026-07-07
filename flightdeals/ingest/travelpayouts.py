@@ -59,12 +59,16 @@ class TravelpayoutsSource(DataSource):
         marker: Optional[str] = None,
         limit: int = 30,
         timeout: int = 15,
+        gates: Optional[list[str]] = None,
     ):
         self.token = token or os.getenv("TRAVELPAYOUTS_TOKEN")
         self.marker = marker or os.getenv("TRAVELPAYOUTS_MARKER")  # 聯盟變現
         self.currency = currency
         self.limit = limit
         self.timeout = timeout
+        # 只收這些訂票網站（gate）開的價：外導到 Trip.com 時限定 ["Trip.com"]，
+        # 讓顯示價格與點過去的網站同源對齊。None/空 = 不過濾。
+        self.gates = gates
 
     def search(self, route, depart=None, ret=None):
         if not self.token:
@@ -96,6 +100,8 @@ class TravelpayoutsSource(DataSource):
         for item in (payload or {}).get("data", []) or []:
             price = item.get("price")
             if price is None:
+                continue
+            if self.gates and item.get("gate") not in self.gates:
                 continue
             depart = _parse_dt(item.get("departure_at"))
             ret = _parse_dt(item.get("return_at"))

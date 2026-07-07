@@ -1,5 +1,5 @@
-# 雲端部署用設定（Railway）。抓真實票價 + 每 15 分自動更新。
-# DB 位置不寫在這裡，改由環境變數 FLIGHTDEALS_DB 決定（指向持久化 volume，見 DEPLOY.md）。
+# 正式抓票設定（Path A：GitHub Actions 每 15 分跑，寫入 Supabase）。
+# DB 連線由環境變數 DATABASE_URL 提供（GitHub Secret，見 SUPABASE_DEPLOY.md）。
 
 routes:
   - [TPE, NRT]
@@ -16,7 +16,8 @@ sources:
   - name: travelpayouts
     params:
       currency: twd
-      limit: 30
+      limit: 100            # 抓多一點再過濾 gate，Trip.com 約佔 2-3 成
+      gates: ["Trip.com"]   # 只收 Trip.com 開的價：顯示價格與外導網站同源對齊
       # marker 由環境變數 TRAVELPAYOUTS_MARKER 提供（變現用）
 
 detectors:

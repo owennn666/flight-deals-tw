@@ -14,11 +14,13 @@ SAMPLE = {
             "departure_at": "2026-08-15T10:00:00+08:00",
             "return_at": "2026-08-22T18:00:00+09:00",
             "transfers": 0, "link": "/search/TPE1508NRT2208",
+            "gate": "Trip.com",
         },
         {
             "origin": "TPE", "destination": "NRT", "price": 9100, "airline": "BR",
             "departure_at": "2026-09-01T09:00:00+08:00",
             "link": "/search/xyz?foo=1",
+            "gate": "Kiwi.com",
         },
         {"origin": "TPE", "destination": "NRT", "price": None},  # 應被略過
     ],
@@ -60,6 +62,20 @@ def test_parse_v3_prices():
     assert offers[1].flight_number is None  # SAMPLE 第二筆無 flight_number
     assert offers[1].transfers is None  # SAMPLE 第二筆無 transfers
     assert offers[1].depart_time == "09:00"
+
+
+def test_gate_filter_keeps_only_listed_gates():
+    src = _StubSource(token="t", currency="twd", gates=["Trip.com"])
+    offers = src.search(Route("TPE", "NRT"))
+    # SAMPLE 三筆：Trip.com / Kiwi.com / price=None → 只留 Trip.com 那筆
+    assert [o.price for o in offers] == [8200.0]
+    assert offers[0].airline == "JX"
+
+
+def test_no_gate_filter_keeps_all():
+    src = _StubSource(token="t", currency="twd")  # gates 未設 = 不過濾
+    offers = src.search(Route("TPE", "NRT"))
+    assert [o.price for o in offers] == [8200.0, 9100.0]
 
 
 def test_missing_token_raises():
