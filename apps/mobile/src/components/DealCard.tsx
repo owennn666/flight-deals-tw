@@ -3,6 +3,18 @@ import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Deal } from "../api/types";
 import { AIRLINE_NAMES } from "../api/client";
 
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const thisYear = new Date().getFullYear();
+  return y === thisYear ? `${m}/${d}` : `${y}/${m}/${d}`;
+}
+
+function dateLine(deal: Deal): string | null {
+  if (!deal.depart_date) return null;
+  if (deal.return_date) return `${fmtDate(deal.depart_date)} – ${fmtDate(deal.return_date)} 來回`;
+  return `${fmtDate(deal.depart_date)} 單程`;
+}
+
 function flightInfoLine(deal: Deal): string | null {
   const parts: string[] = [];
   if (deal.airline) parts.push(`${AIRLINE_NAMES[deal.airline] ?? deal.airline}${deal.flight_number ? ` ${deal.flight_number}` : ""}`);
@@ -17,6 +29,7 @@ function flightInfoLine(deal: Deal): string | null {
 export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () => void }) {
   const isBug = deal.type === "error_fare";
   const flightInfo = flightInfoLine(deal);
+  const dates = dateLine(deal);
   const route = deal.route_str.replace("->", " → ");
   const pct = Math.round(deal.discount_pct * 100);
   const median = Math.round(deal.baseline_median).toLocaleString();
@@ -34,6 +47,7 @@ export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () =>
           </Text>
         </View>
       </View>
+      {dates ? <Text style={[styles.dates, isBug && styles.subBug]}>{dates}</Text> : null}
       <Text style={[styles.price, isBug && styles.textBug]}>
         {deal.price.toLocaleString()} <Text style={styles.currency}>{deal.currency}</Text>
       </Text>
@@ -71,7 +85,8 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 12, fontWeight: "600" },
   pillTextGood: { color: "#0F6E56" },
   pillTextBug: { color: "#A32D2D" },
-  price: { fontSize: 24, fontWeight: "800", color: "#111", marginTop: 6 },
+  dates: { fontSize: 13, fontWeight: "600", color: "#444", marginTop: 5 },
+  price: { fontSize: 24, fontWeight: "800", color: "#111", marginTop: 2 },
   currency: { fontSize: 13, fontWeight: "600", color: "#999" },
   sub: { fontSize: 13, color: "#555", marginTop: 4 },
   subBug: { color: "#A32D2D" },
