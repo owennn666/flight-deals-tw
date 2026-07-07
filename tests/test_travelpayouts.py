@@ -39,11 +39,15 @@ def test_parse_v3_prices():
     assert offers[0].currency == "TWD"
     assert offers[0].depart_date == date(2026, 8, 15)
     assert offers[0].return_date == date(2026, 8, 22)
-    # 聯盟連結：補完整網址 + 帶 marker
-    assert offers[0].deep_link.startswith("https://www.aviasales.com/search/TPE1508NRT2208")
-    assert "marker=12345" in offers[0].deep_link
-    # 第二筆本身已有 query，marker 應以 & 併接
-    assert "?foo=1&marker=12345" in offers[1].deep_link
+    # 外導：Trip.com 預填搜尋連結（航線 + 日期）
+    dl0 = offers[0].deep_link
+    assert dl0.startswith("https://tw.trip.com/flights/showfarefirst")
+    assert "dcity=tpe" in dl0 and "acity=nrt" in dl0
+    assert "ddate=2026-08-15" in dl0 and "rdate=2026-08-22" in dl0 and "triptype=rt" in dl0
+    # 第二筆無回程日 → 單程，不帶 rdate
+    dl1 = offers[1].deep_link
+    assert "ddate=2026-09-01" in dl1 and "triptype=ow" in dl1
+    assert "rdate=" not in dl1
 
 
 def test_missing_token_raises():

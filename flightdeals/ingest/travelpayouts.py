@@ -39,7 +39,8 @@ def _parse_dt(s: Optional[str]) -> Optional[date]:
 class TravelpayoutsSource(DataSource):
     name = "travelpayouts"
     BASE = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
-    AVIASALES = "https://www.aviasales.com"
+    # 外導：Trip.com 預填搜尋（資料只給航線/日期，導到該航線那些日期的搜尋頁）
+    TRIP_BASE = "https://tw.trip.com/flights/showfarefirst"
 
     def __init__(
         self,
@@ -86,27 +87,44 @@ class TravelpayoutsSource(DataSource):
             price = item.get("price")
             if price is None:
                 continue
+            depart = _parse_dt(item.get("departure_at"))
+            ret = _parse_dt(item.get("return_at"))
             offers.append(
                 FarePrice(
                     route=route,
                     price=float(price),
                     currency=self.currency.upper(),
                     cabin=Cabin.ECONOMY,
-                    depart_date=_parse_dt(item.get("departure_at")),
-                    return_date=_parse_dt(item.get("return_at")),
+                    depart_date=depart,
+                    return_date=ret,
                     source=self.name,
-                    deep_link=self._deep_link(item.get("link")),
+                    deep_link=self._trip_link(route, depart, ret),
                     raw=item,
                 )
             )
         return offers
 
-    def _deep_link(self, link: Optional[str]) -> str:
-        """把相對的 Aviasales 連結補成完整（聯盟）連結。"""
-        if not link:
-            return self.AVIASALES
-        url = f"{self.AVIASALES}{link}"
-        if self.marker:
-            sep = "&" if "?" in url else "?"
-            url = f"{url}{sep}marker={self.marker}"
-        return url
+    def _trip_link(self, route: Route, depart, ret) -> str:
+        """組 Trip.com 預填搜尋連結（tw.trip.com、繁中、TWD）。
+
+        Trip.com 不提供「確切票面」深連結，這是資料層能做到最貼近的結果：把
+        使用者帶到該航線、那些日期的搜尋頁。無出發日則導到機票首頁避免壞連結。
+        之後要接 Trip.com 聯盟分潤：URL 尾端加 &Allianceid=xxx&SID=xxx 即可。
+        """
+        if depart is None:
+            return "https://tw.trip.com/flights/"
+        params = {
+            "dcity": route.origin.lower(),
+            "acity": route.destination.lower(),
+            "ddate": depart.isoformat(),
+            "class": "y",
+            "quantity": "1",
+            "locale": "zh-TW",
+            "curr": "TWD",
+        }
+        if ret is not None:
+            params["rdate"] = ret.isoformat()
+            params["triptype"] = "rt"
+        else:
+            params["triptype"] = "ow"
+        return f"{self.TRIP_BASE}?{urllib.parse.urlencode(params)}"
