@@ -1,0 +1,27 @@
+name: 抓票（每 15 分）
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # 每 15 分鐘（GitHub 排程可能略有延遲）
+  workflow_dispatch: {}       # 也可到 Actions 頁手動觸發
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: fetch
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+      - name: 抓票 + 偵測 + 寫入 Supabase
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
+        run: python main.py run -c config.prod.yaml

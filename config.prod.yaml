@@ -1,0 +1,33 @@
+# 雲端部署用設定（Railway）。抓真實票價 + 每 15 分自動更新。
+# DB 位置不寫在這裡，改由環境變數 FLIGHTDEALS_DB 決定（指向持久化 volume，見 DEPLOY.md）。
+
+routes:
+  - [TPE, NRT]
+  - [TPE, KIX]
+  - [TPE, ICN]
+  - [TPE, BKK]
+  - [TPE, DAD]
+  - [TPE, CDG]
+  - [TPE, LHR]
+
+window_days: 90
+
+sources:
+  - name: travelpayouts
+    params:
+      currency: twd
+      limit: 30
+      # marker 由環境變數 TRAVELPAYOUTS_MARKER 提供（變現用）
+
+detectors:
+  - name: cheap
+    params: { threshold: 0.25, strong: 0.40 }
+  - name: error_fare
+    params: { threshold: 0.70 }
+
+notifiers:
+  - name: console
+
+# 儲存改用 Supabase Postgres（連線字串由環境變數 DATABASE_URL 提供）
+store:
+  name: postgres

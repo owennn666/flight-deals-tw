@@ -1,0 +1,46 @@
+# 上線設定範例。複製成 config.yaml 後用：python main.py run -c config.yaml
+# （讀 YAML 需 pip install pyyaml；不裝也能用預設 dict 設定跑）
+
+routes:
+  - [TPE, NRT]
+  - [TPE, KIX]
+  - [TPE, ICN]
+  - [TPE, BKK]
+  - [TPE, DAD]
+  - [TPE, CDG]
+  - [TPE, LHR]
+
+window_days: 90
+
+# 資料源：免費首選 travelpayouts（需 .env 的 TRAVELPAYOUTS_TOKEN；marker 選填用於變現）
+sources:
+  - name: travelpayouts
+    params:
+      currency: twd
+      limit: 30
+      # marker: "你的聯盟marker"   # 也可放 .env 的 TRAVELPAYOUTS_MARKER
+  # 註：amadeus 2026/7/17 停用、kiwi 需 5 萬 MAU，皆不建議新專案採用。
+
+store:
+  name: sqlite
+  params:
+    path: flightdeals.db
+
+detectors:
+  - name: cheap
+    params:
+      threshold: 0.25   # 便宜 25% 起算好康
+      strong: 0.40      # 便宜 40% 標記強力推薦
+  - name: error_fare
+    params:
+      threshold: 0.70   # 便宜 70% 起算疑似標錯價（需人工複核）
+  # - name: nested       # 四腳票/隱藏城市，Phase 3 接上構票資料源後再啟用
+
+notifiers:
+  - name: console
+  # 上線改推 LINE（需 .env 的 LINE_CHANNEL_ACCESS_TOKEN）：
+  # - name: line
+  # App 原生推播（讀同一個 DB 的訂閱，命中就發 Expo push）：
+  # - name: expo_push
+  #   params:
+  #     subscriber_db: flightdeals.db

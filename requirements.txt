@@ -1,0 +1,15 @@
+# 偵測引擎的 demo 與核心測試「零依賴」即可執行（只用 Python 3.10+ 標準庫）。
+# 以下為「選用」，接真實服務 / 跑 API / 跑測試時才需要：
+
+pyyaml>=6.0            # 讀 config.yaml（選用；不裝則用內建預設設定）
+pytest>=8.0           # 跑單元測試（選用）
+
+# API 層（python main.py serve、tests/test_api.py）才需要：
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27           # FastAPI TestClient 需要
+
+# Supabase（Postgres）儲存 — GitHub Actions 抓票寫入用：
+psycopg[binary]>=3.1
+
+# 註：真實資料源與 LINE/Expo 推播皆以標準庫 urllib 實作，不需 requests。

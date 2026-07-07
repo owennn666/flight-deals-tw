@@ -1,0 +1,5 @@
+# 強制 Railway/Nixpacks 用 Python 建置（避免被 apps/mobile 的 package.json 誤判成 Node）
+providers = ["python"]
+
+[start]
+cmd = "python main.py serve --host 0.0.0.0 --port $PORT --poll 900 -c config.prod.yaml"

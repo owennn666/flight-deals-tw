@@ -1,0 +1,35 @@
+# 真實資料設定：用 Travelpayouts（token 放在 .env 的 TRAVELPAYOUTS_TOKEN）
+# 跑：python main.py seed -c config.yaml   （先暖機基準線）
+#     python main.py run  -c config.yaml   （抓真實票價、偵測）
+
+routes:
+  - [TPE, NRT]
+  - [TPE, KIX]
+  - [TPE, ICN]
+  - [TPE, BKK]
+  - [TPE, DAD]
+  - [TPE, CDG]
+  - [TPE, LHR]
+
+window_days: 90
+
+sources:
+  - name: travelpayouts
+    params:
+      currency: twd
+      limit: 30
+      # marker 放 .env 的 TRAVELPAYOUTS_MARKER（填了訂票連結才會帶你的聯盟碼）
+
+store:
+  name: sqlite
+  params:
+    path: flightdeals.db
+
+detectors:
+  - name: cheap
+    params: { threshold: 0.25, strong: 0.40 }
+  - name: error_fare
+    params: { threshold: 0.70 }
+
+notifiers:
+  - name: console

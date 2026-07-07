@@ -1,0 +1,10 @@
+# 部署後端時不需要帶上的東西
+apps/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.db-journal
+.env

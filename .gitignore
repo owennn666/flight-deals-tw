@@ -1,0 +1,20 @@
+# 機密 / 本機設定（務必別 commit）
+.env
+.env.*
+!.env.example
+
+# 資料庫
+*.db
+*.db-journal
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Node / Expo（apps/mobile）
+node_modules/
+.expo/
+dist/
+web-build/

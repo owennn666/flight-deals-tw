@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "便宜機票",
+    "slug": "flight-deals",
+    "scheme": "flightdeals",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.flightdeals"
+    },
+    "android": {
+      "package": "com.example.flightdeals"
+    },
+    "plugins": ["expo-notifications"],
+    "extra": {
+      "apiBaseUrl": "http://localhost:8010"
+    }
+  }
+}
