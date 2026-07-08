@@ -72,7 +72,9 @@ export default function DealsScreen({ navigation }: Props) {
         minDiscount,
         maxPrice,
       });
-      setDeals(hideLcc ? rows.filter((d) => !d.airline || !LCC_AIRLINES.includes(d.airline)) : rows);
+      // 只顯示能標示來源（gate）的 deal：舊的未標源 deal 與無法歸戶的報價都不顯示
+      const attributed = rows.filter((d) => d.gate);
+      setDeals(hideLcc ? attributed.filter((d) => !d.airline || !LCC_AIRLINES.includes(d.airline)) : attributed);
     } catch (e) {
       setError(e instanceof Error ? e.message : "載入失敗");
     } finally {
