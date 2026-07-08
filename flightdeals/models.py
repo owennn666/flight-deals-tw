@@ -41,6 +41,7 @@ class FarePrice:
     flight_number: Optional[str] = None      # 航班號，例："395"
     transfers: Optional[int] = None          # 轉機次數，0 = 直飛
     depart_time: Optional[str] = None        # 出發當地時間 "HH:MM"
+    gate: Optional[str] = None               # 開價的訂票網站（gate），例："Trip.com"
 
 
 @dataclass

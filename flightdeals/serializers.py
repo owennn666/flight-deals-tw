@@ -26,5 +26,6 @@ def deal_to_dict(deal: Deal) -> dict:
         "reasons": list(deal.reasons),
         "deep_link": f.deep_link,
         "source": f.source,
+        "gate": f.gate,
         "dedupe_key": deal.dedupe_key(),
     }

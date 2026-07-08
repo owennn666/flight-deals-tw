@@ -66,8 +66,9 @@ class TravelpayoutsSource(DataSource):
         self.currency = currency
         self.limit = limit
         self.timeout = timeout
-        # 只收這些訂票網站（gate）開的價：外導到 Trip.com 時限定 ["Trip.com"]，
-        # 讓顯示價格與點過去的網站同源對齊。None/空 = 不過濾。
+        # 只收這些訂票網站（gate）開的價。預設（prod）不設，收全部家；
+        # 外導改採分流（Trip.com → Trip 預填頁，其他家 → Aviasales 比價頁），
+        # 不再需要靠這個過濾對齊顯示與外導網站。保留參數供向後相容與測試。
         self.gates = gates
 
     def search(self, route, depart=None, ret=None):
@@ -106,6 +107,12 @@ class TravelpayoutsSource(DataSource):
             depart = _parse_dt(item.get("departure_at"))
             ret = _parse_dt(item.get("return_at"))
             flight_number = item.get("flight_number")
+            gate = item.get("gate")
+            deep_link = (
+                self._trip_link(route, depart, ret)
+                if gate == "Trip.com"
+                else self._aviasales_link(item.get("link"), route, depart)
+            )
             offers.append(
                 FarePrice(
                     route=route,
@@ -115,7 +122,7 @@ class TravelpayoutsSource(DataSource):
                     depart_date=depart,
                     return_date=ret,
                     source=self.name,
-                    deep_link=self._trip_link(route, depart, ret),
+                    deep_link=deep_link,
                     raw=item,
                     airline=item.get("airline"),
                     flight_number=(
@@ -123,6 +130,7 @@ class TravelpayoutsSource(DataSource):
                     ),
                     transfers=item.get("transfers"),
                     depart_time=_parse_time(item.get("departure_at")),
+                    gate=gate,
                 )
             )
         return offers
@@ -151,3 +159,27 @@ class TravelpayoutsSource(DataSource):
         else:
             params["triptype"] = "ow"
         return f"{self.TRIP_BASE}?{urllib.parse.urlencode(params)}"
+
+    def _aviasales_link(self, link: Optional[str], route: Route, depart) -> str:
+        """組 Aviasales 比價頁連結（非 Trip.com 開的價都導這裡）。
+
+        優先用 API 回傳的 link（去掉會 15 分鐘過期的 t= token query）；
+        沒有 link 時退而用航線/日期自組搜尋路徑；都沒有就導首頁。
+        有設 marker（聯盟）則附加在最後。
+        """
+        if link:
+            path = link.split("?")[0]
+            url = f"https://www.aviasales.com{path}"
+        elif depart is not None:
+            ddmm = f"{depart.day:02d}{depart.month:02d}"
+            url = (
+                f"https://www.aviasales.com/search/"
+                f"{route.origin.upper()}{ddmm}{route.destination.upper()}1"
+            )
+        else:
+            url = "https://www.aviasales.com"
+
+        if self.marker:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}marker={self.marker}"
+        return url

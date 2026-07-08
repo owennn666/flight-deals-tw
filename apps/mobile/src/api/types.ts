@@ -24,6 +24,7 @@ export interface Deal {
   flight_number?: string | null;
   depart_time?: string | null; // "HH:MM"
   transfers?: number | null; // 0=直飛
+  gate?: string | null; // 開這個價的訂票網站（如 Trip.com / Kiwi.com）
 }
 
 export interface RouteInfo {

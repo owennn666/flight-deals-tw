@@ -40,6 +40,7 @@ create table if not exists public.deals (
   flight_number      text,
   transfers          int,
   depart_time        text,
+  gate               text,
   dedupe_key         text unique
 );
 create index if not exists idx_deals_id on public.deals (id desc);

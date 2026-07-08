@@ -35,7 +35,11 @@ export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () =>
   const median = Math.round(deal.baseline_median).toLocaleString();
   const hint = isBug
     ? `比平常低 ${pct}% · 航司不保證出票，訂票風險自負`
-    : `這條航線平常約 ${median}${deal.tier === "strong" ? " · 難得低價" : ""}`;
+    : `這條航線平常約 ${median}${deal.tier === "strong" ? " · 難得低價" : ""}${deal.gate ? ` · 經 ${deal.gate} 訂` : ""}`;
+  const isTrip = deal.gate === "Trip.com" || !deal.gate;
+  const buttonLabel = isBug
+    ? (isTrip ? "前往 Trip.com 查看 ↗" : "前往 Aviasales 查看 ↗")
+    : (isTrip ? "前往 Trip.com 訂票 ↗" : "前往 Aviasales 比價 ↗");
 
   return (
     <Pressable style={[styles.card, isBug && styles.cardBug]} onPress={onPress}>
@@ -58,7 +62,7 @@ export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () =>
           style={[styles.button, isBug && styles.buttonBug]}
           onPress={() => Linking.openURL(deal.deep_link as string)}
         >
-          <Text style={styles.buttonText}>{isBug ? "前往 Trip.com 查看 ↗" : "前往 Trip.com 訂票 ↗"}</Text>
+          <Text style={styles.buttonText}>{buttonLabel}</Text>
         </Pressable>
       ) : null}
     </Pressable>

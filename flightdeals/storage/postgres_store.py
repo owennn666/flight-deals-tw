@@ -78,9 +78,9 @@ class PostgresStore(PriceStore):
                   (type, route_str, origin, destination, price, currency, cabin,
                    depart_date, return_date, baseline_median, discount_pct, tier,
                    needs_verification, reasons, deep_link, source,
-                   airline, flight_number, transfers, depart_time, dedupe_key)
+                   airline, flight_number, transfers, depart_time, gate, dedupe_key)
                 values
-                  (%s,%s,%s,%s,%s,%s,%s,%s::date,%s::date,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s,%s,%s)
+                  (%s,%s,%s,%s,%s,%s,%s,%s::date,%s::date,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s,%s,%s,%s)
                 on conflict (dedupe_key) do nothing
                 returning id
                 """,
@@ -90,7 +90,7 @@ class PostgresStore(PriceStore):
                     d["baseline_median"], d["discount_pct"], d["tier"], d["needs_verification"],
                     json.dumps(d["reasons"]), d.get("deep_link"), d.get("source"),
                     d.get("airline"), d.get("flight_number"), d.get("transfers"), d.get("depart_time"),
-                    d["dedupe_key"],
+                    d.get("gate"), d["dedupe_key"],
                 ),
             )
             row = cur.fetchone()
@@ -99,7 +99,7 @@ class PostgresStore(PriceStore):
     def recent_deals(self, limit=50, deal_type=None):
         q = ("select id, created_at, type, route_str, origin, destination, price, currency, cabin,"
              " depart_date, return_date, baseline_median, discount_pct, tier, needs_verification,"
-             " reasons, deep_link, source, airline, flight_number, transfers, depart_time from deals")
+             " reasons, deep_link, source, airline, flight_number, transfers, depart_time, gate from deals")
         args: list = []
         if deal_type:
             q += " where type=%s"
