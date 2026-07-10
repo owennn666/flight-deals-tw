@@ -21,12 +21,12 @@
 - `SUPABASE_DEPLOY.md` — **部署步驟（照這個做）**
 - `main.py` — CLI：`demo` / `seed` / `run` / `serve` / `demo-data`
 
-## 現在要做：部署（照 SUPABASE_DEPLOY.md）
-1. Supabase 專案 + 跑 `supabase_schema.sql`（使用者建帳號/專案）。
-2. 推 GitHub（建議 **public**，讓 Actions 無限免費）。
-3. 設 GitHub Secrets：`DATABASE_URL`、`TRAVELPAYOUTS_TOKEN`、（選）`TRAVELPAYOUTS_MARKER`。可用 `gh secret set`。
-4. Actions 手動觸發抓票 **兩次**（第一次建基準線），確認 Supabase `deals` 表有資料。
-5. Vercel 部署 `apps/mobile`（Root Directory = `apps/mobile`），env：`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`。
+## 現況：已上線（2026-07-10）
+- **live 站** https://flight-deals-tw.vercel.app ；repo github.com/owennn666/flight-deals-tw（public）；Supabase 專案「Piao」（ref `kmvyjcmxstghppwqxsbg`）。
+- **抓票排程**：GitHub Actions 每 15 分自動跑（cron），寫進 Supabase `deals`。手動觸發：`gh workflow run fetch.yml --repo owennn666/flight-deals-tw`。
+- **部署**：前端**非** git 自動部署，需手動 `cd apps/mobile && vercel deploy --prod`；後端隨排程自動生效。
+- **七日暖機語意**：基準線可信門檻 = 樣本 ≥50 且橫跨 ≥7 曆日。新部署後每輪印 `本輪偵測到 0 筆好康` 是**預期行為**（暖機中），非壞掉；累積滿 7 天才恢復產出新好康。
+- 首次建置細節見 `SUPABASE_DEPLOY.md`。
 
 ## 祕密 / 環境變數（絕不 hardcode、不 commit；`.env` 已 gitignore）
 - `TRAVELPAYOUTS_TOKEN`（抓票）、`DATABASE_URL`（Supabase 連線字串，含 DB 密碼）→ GitHub Secrets。
@@ -39,13 +39,14 @@
 - 本機 8000 埠被別的程式佔用 → 本機 `serve` 用 8010（Path A 部署不需要 serve）。
 - 跑 Expo 需要 **watchman**（否則 EMFILE）：`brew install watchman`。Node 目前 v25（很新），遇怪事可用 nvm 切 20。
 
-## 尚未對真環境驗證（部署時要盯）
-- `postgres_store.py` 的 SQL **只用假連線測過 Python 邏輯，沒對真 Supabase 跑過** → 第一次抓票盯 Actions log，可能要修小地方（欄位名/型別/`::date`/`::jsonb` cast）。
-- 前端 `client.ts`（Supabase PostgREST）也沒對真 Supabase 測過。
-- 首次抓票要跑 **兩輪** 才會有 deals（第一輪只建基準線）。
+## live 資料庫操作邊界（實測規則，務必遵守）
+- **讀取**（read-only query）：隨時可做，走 Supabase Management API `POST /v1/projects/{ref}/database/query`（token 在 `.env` 的 `SUPABASE_ACCESS_TOKEN`；HTTP 需帶 `User-Agent: curl/8.7.1`，否則被 Cloudflare 1010 擋）。
+- **DDL**（加欄/索引/constraint）：先把確切 SQL 列給使用者、拿到明確同意，再由 agent 執行。
+- **改/刪資料列**：自動安全機制會擋、且視重試為繞過——**不要嘗試**，一律請使用者自己貼 Supabase SQL Editor 跑。
+- `postgres_store.py` 與前端 `client.ts` 已對真 Supabase 驗證過（不再是「只用假連線測過」）。
 
 ## 本機跑 / 測
-- 測試：`~/.flightdeals-venv/bin/python -m pytest -q`（目前 25 passed）
+- 測試：`~/.flightdeals-venv/bin/python -m pytest -q`（目前 54 passed）
 - 離線 demo：`python main.py demo`
 - 抓真票（需 `DATABASE_URL` + `TRAVELPAYOUTS_TOKEN` 環境變數 + `pip install 'psycopg[binary]'`）：`python main.py run -c config.prod.yaml`
 
