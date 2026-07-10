@@ -62,7 +62,10 @@ class TravelpayoutsSource(DataSource):
         gates: Optional[list[str]] = None,
     ):
         self.token = token or os.getenv("TRAVELPAYOUTS_TOKEN")
-        self.marker = marker or os.getenv("TRAVELPAYOUTS_MARKER")  # 聯盟變現
+        self.marker = marker or os.getenv("TRAVELPAYOUTS_MARKER")  # 聯盟變現（Aviasales 連結用）
+        # Trip.com 聯盟（申請通過後設環境變數即生效；未設則連結不帶聯盟參數）
+        self.trip_alliance_id = os.getenv("TRIP_ALLIANCE_ID")
+        self.trip_sid = os.getenv("TRIP_SID")
         self.currency = currency
         self.limit = limit
         self.timeout = timeout
@@ -158,6 +161,9 @@ class TravelpayoutsSource(DataSource):
             params["triptype"] = "rt"
         else:
             params["triptype"] = "ow"
+        if self.trip_alliance_id and self.trip_sid:
+            params["Allianceid"] = self.trip_alliance_id
+            params["SID"] = self.trip_sid
         return f"{self.TRIP_BASE}?{urllib.parse.urlencode(params)}"
 
     def _aviasales_link(self, link: Optional[str], route: Route, depart) -> str:

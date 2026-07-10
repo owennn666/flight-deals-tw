@@ -24,6 +24,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
+          TRIP_ALLIANCE_ID: ${{ secrets.TRIP_ALLIANCE_ID }}
+          TRIP_SID: ${{ secrets.TRIP_SID }}
         run: python main.py run -c config.prod.yaml
       - name: 失敗告警（設 ALERT_WEBHOOK secret 後生效；未設時 GitHub 仍會 email 通知排程失敗）
         if: failure()

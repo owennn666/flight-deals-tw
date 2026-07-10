@@ -78,7 +78,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   const token = tokenResp.data;
 
   try {
-    await api.registerDevice(token, Platform.OS);
+    await api.registerDevice(token, Platform.OS, getOrCreateDeviceId());
   } catch (e) {
     console.warn("註冊裝置到後端失敗（後端沒開？）", e);
   }

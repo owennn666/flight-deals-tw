@@ -60,8 +60,16 @@ class ExpoPushNotifier(Notifier):
         subscriber_db: str = "flightdeals.db",
         repo: Optional[SubscriberRepo] = None,
         sender: Optional[ExpoPushSender] = None,
+        backend: str = "sqlite",
     ):
-        self.repo = repo or SQLiteSubscriberRepo(subscriber_db)
+        if repo is not None:
+            self.repo = repo
+        elif backend == "postgres":
+            from ..subscribers import PostgresSubscriberRepo  # 延遲 import，避免沒裝 psycopg 的環境炸掉
+
+            self.repo = PostgresSubscriberRepo()
+        else:
+            self.repo = SQLiteSubscriberRepo(subscriber_db)
         self.sender = sender or ExpoPushSender()
 
     def send(self, deal: Deal) -> bool:

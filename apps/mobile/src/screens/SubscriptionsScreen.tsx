@@ -46,7 +46,10 @@ export default function SubscriptionsScreen() {
         max_price: maxPrice ? Number(maxPrice) : null,
         cabin: null,
       });
-      Alert.alert("已儲存", "推播功能籌備中；你的訂閱設定會先保存，功能上線後自動生效。");
+      Alert.alert(
+        "已儲存",
+        "使用 App 版時，符合條件的好康會推播通知；網頁版暫不支援推播，歡迎隨時回來查看。"
+      );
     } catch (e) {
       Alert.alert("儲存失敗", e instanceof Error ? e.message : "");
     } finally {

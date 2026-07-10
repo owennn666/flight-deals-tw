@@ -69,6 +69,26 @@ def test_parse_v3_prices():
     assert offers[1].gate == "Kiwi.com"
 
 
+def test_trip_link_alliance_params(monkeypatch):
+    """設了 Trip.com 聯盟環境變數 → Trip 連結帶 Allianceid/SID；Aviasales 連結不受影響。"""
+    monkeypatch.setenv("TRIP_ALLIANCE_ID", "5743816")
+    monkeypatch.setenv("TRIP_SID", "146111470")
+    src = _StubSource(token="t", currency="twd")
+    offers = src.search(Route("TPE", "NRT"))
+    dl0 = offers[0].deep_link  # gate=Trip.com → Trip 預填連結
+    assert "Allianceid=5743816" in dl0 and "SID=146111470" in dl0
+    dl1 = offers[1].deep_link  # gate=Kiwi.com → Aviasales，不帶 Trip 聯盟參數
+    assert "Allianceid" not in dl1
+
+
+def test_trip_link_no_alliance_when_unset(monkeypatch):
+    monkeypatch.delenv("TRIP_ALLIANCE_ID", raising=False)
+    monkeypatch.delenv("TRIP_SID", raising=False)
+    src = _StubSource(token="t", currency="twd")
+    offers = src.search(Route("TPE", "NRT"))
+    assert "Allianceid" not in offers[0].deep_link
+
+
 def test_gate_filter_keeps_only_listed_gates():
     src = _StubSource(token="t", currency="twd", gates=["Trip.com"])
     offers = src.search(Route("TPE", "NRT"))

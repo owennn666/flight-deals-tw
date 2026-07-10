@@ -97,11 +97,11 @@ export const api = {
     return toDeal(rows[0]);
   },
 
-  registerDevice: (token: string, platform: string) =>
+  registerDevice: (token: string, platform: string, deviceId: string) =>
     rest("/devices?on_conflict=token", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify({ token, platform }),
+      body: JSON.stringify({ token, platform, device_id: deviceId }),
     }),
 
   getSubscription: async (device: string): Promise<Subscription> => {

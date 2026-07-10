@@ -27,6 +27,8 @@ detectors:
 
 notifiers:
   - name: console
+  - name: expo_push
+    params: { backend: postgres }
 
 # 儲存改用 Supabase Postgres（連線字串由環境變數 DATABASE_URL 提供）
 store:

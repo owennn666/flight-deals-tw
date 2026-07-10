@@ -51,16 +51,27 @@ create table if not exists public.deals_seen (
   ts  timestamptz default now()
 );
 
--- 裝置 / 訂閱（前端寫入，未來推播用）
+-- 裝置 / 訂閱（前端寫入，推播讀取）
+-- device_id：前端持久化的裝置 UUID（與 subscriptions.device 對應，用來 join 出 token）
 create table if not exists public.devices (
-  token      text primary key,
+  token      text primary key
+    constraint devices_token_len check (char_length(token) <= 512),
   platform   text,
+  device_id  text
+    constraint devices_device_id_len check (char_length(device_id) <= 128),
   updated_at timestamptz default now()
 );
+-- 同一裝置只能對應一筆最新 device_id → token（device_id 為 null 時不受唯一限制）
+create unique index if not exists idx_devices_device_id
+  on public.devices (device_id) where device_id is not null;
+
 create table if not exists public.subscriptions (
-  device     text primary key,
-  routes     jsonb,
-  max_price  double precision,
+  device     text primary key
+    constraint subs_device_len check (char_length(device) <= 128),
+  routes     jsonb
+    constraint subs_routes_size check (octet_length(routes::text) <= 8192),
+  max_price  double precision
+    constraint subs_max_price_range check (max_price is null or (max_price >= 0 and max_price <= 1e7)),
   cabin      text,
   updated_at timestamptz default now()
 );
