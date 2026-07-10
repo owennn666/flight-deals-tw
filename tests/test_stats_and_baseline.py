@@ -1,7 +1,8 @@
 """基準線與統計的單元測試（純函式、可重現）。"""
-from flightdeals.models import Cabin, FarePrice, Route
+from flightdeals.models import Route
 from flightdeals.stats import mad, median, percentile, robust_z
 from flightdeals.storage.memory import InMemoryStore
+from tests._helpers import multi_day_prices, same_day_prices
 
 
 def test_median_and_mad():
@@ -40,31 +41,45 @@ def test_percentile_edge_cases():
 def test_baseline_needs_min_samples():
     store = InMemoryStore()
     r = Route("TPE", "NRT")
-    store.add_prices([FarePrice(route=r, price=12000, cabin=Cabin.ECONOMY) for _ in range(19)])
-    # 少於 20 筆 → 無基準線（分位數需要足夠樣本才可信）
+    store.add_prices(multi_day_prices(r, [12000] * 49, days=8))
+    # 49 筆 < 50 → 無基準線（樣本數不足，不論橫跨幾天）
     assert store.baseline(r) is None
 
 
 def test_baseline_reliability_threshold():
     store = InMemoryStore()
     r = Route("TPE", "NRT")
-    store.add_prices([FarePrice(route=r, price=12000) for _ in range(20)])
+    store.add_prices(multi_day_prices(r, [12000] * 60, days=8))
     b = store.baseline(r)
     assert b is not None
-    assert b.sample_size == 20
+    assert b.sample_size == 60
+    assert b.distinct_days == 8
     assert b.is_reliable is True
     assert b.median == 12000
+
+
+def test_baseline_unreliable_when_single_day():
+    store = InMemoryStore()
+    r = Route("TPE", "OSA")
+    # 60 筆樣本數夠，但全擠在同一天 → 不算「跟平常比」，不可靠
+    store.add_prices(same_day_prices(r, [12000] * 60))
+    b = store.baseline(r)
+    assert b is not None
+    assert b.sample_size == 60
+    assert b.distinct_days == 1
+    assert b.is_reliable is False
 
 
 def test_baseline_has_percentiles():
     store = InMemoryStore()
     r = Route("TPE", "BKK")
-    # 25 筆，其中 20 筆是 6000（廉航常態價）、5 筆是 3800（歷史特價）
-    prices = [6000] * 20 + [3800] * 5
-    store.add_prices([FarePrice(route=r, price=p) for p in prices])
+    # 50 筆、橫跨 8 天，其中 40 筆是 6000（廉航常態價）、10 筆是 3800（歷史特價）
+    prices = [6000] * 40 + [3800] * 10
+    store.add_prices(multi_day_prices(r, prices, days=8))
     b = store.baseline(r)
     assert b is not None
-    assert b.sample_size == 25
+    assert b.sample_size == 50
+    assert b.is_reliable is True
     # p10/p05 應落在歷史特價附近，而不是等於混合中位數
     assert b.p10 < b.median
     assert b.p05 <= b.p10

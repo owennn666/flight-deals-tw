@@ -75,6 +75,8 @@ def cmd_run(args) -> None:
     cfg = load_config(args.config)
     pipe = build_pipeline(cfg)
     deals = pipe.run_once(_routes(cfg))
+    pruned = pipe.store.prune()
+    print(f"[run] 清理 {pruned} 筆 95 天前舊價")
     pipe.close()
     print(f"\n[run] 本輪偵測到 {len(deals)} 筆好康（已存入 DB，API /deals 可讀）。")
 

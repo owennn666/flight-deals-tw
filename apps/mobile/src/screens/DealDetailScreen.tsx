@@ -3,6 +3,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { DealsStackParamList } from "../../App";
+import { timeAgo } from "../utils/timeAgo";
 
 type Props = NativeStackScreenProps<DealsStackParamList, "DealDetail">;
 
@@ -19,6 +20,7 @@ export default function DealDetailScreen({ route }: Props) {
         {Math.round(deal.discount_pct * 100)}% · {deal.tier}
       </Text>
       {deal.depart_date ? <Text style={styles.sub}>出發：{deal.depart_date}</Text> : null}
+      {deal.created_at ? <Text style={styles.sub}>{timeAgo(deal.created_at)}發現</Text> : null}
 
       <View style={styles.reasons}>
         {deal.reasons.map((r, i) => (

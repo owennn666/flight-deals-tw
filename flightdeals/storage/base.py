@@ -38,3 +38,11 @@ class PriceStore(ABC):
 
     def close(self) -> None:
         return None
+
+    def prune(self, days: int = 95) -> int:
+        """清除 days 天前的舊報價，避免 prices 表無限增長。
+
+        預設 no-op（回 0）；需要落地保存空間的實作（Postgres/SQLite）應覆寫。
+        回傳實際刪除筆數。
+        """
+        return 0

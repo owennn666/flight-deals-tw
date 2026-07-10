@@ -11,7 +11,7 @@ import {
 
 import { api } from "../api/client";
 import type { RouteInfo } from "../api/types";
-import { getDeviceId } from "../notifications/push";
+import { getOrCreateDeviceId } from "../notifications/push";
 
 export default function SubscriptionsScreen() {
   const [routes, setRoutes] = useState<RouteInfo[]>([]);
@@ -22,7 +22,7 @@ export default function SubscriptionsScreen() {
   useEffect(() => {
     api.routes().then(setRoutes).catch(() => setRoutes([]));
     api
-      .getSubscription(getDeviceId())
+      .getSubscription(getOrCreateDeviceId())
       .then((s) => {
         setSelected(new Set(s.routes ?? []));
         if (s.max_price) setMaxPrice(String(s.max_price));
@@ -41,12 +41,12 @@ export default function SubscriptionsScreen() {
     setSaving(true);
     try {
       await api.setSubscription({
-        device: getDeviceId(),
+        device: getOrCreateDeviceId(),
         routes: Array.from(selected),
         max_price: maxPrice ? Number(maxPrice) : null,
         cabin: null,
       });
-      Alert.alert("已儲存", "之後符合條件的好康會推播給你。");
+      Alert.alert("已儲存", "推播功能籌備中；你的訂閱設定會先保存，功能上線後自動生效。");
     } catch (e) {
       Alert.alert("儲存失敗", e instanceof Error ? e.message : "");
     } finally {

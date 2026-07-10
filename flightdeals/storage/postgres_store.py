@@ -45,12 +45,15 @@ class PostgresStore(PriceStore):
         since = datetime.now(timezone.utc) - timedelta(days=window_days)
         with self._conn.cursor() as cur:
             cur.execute(
-                "select price from prices where origin=%s and destination=%s and observed_at>=%s",
+                "select price, observed_at from prices"
+                " where origin=%s and destination=%s and observed_at>=%s",
                 (route.origin, route.destination, since),
             )
-            xs = [r[0] for r in cur.fetchall()]
-        if len(xs) < 20:
+            rows = cur.fetchall()
+        if len(rows) < 50:
             return None
+        xs = [r[0] for r in rows]
+        distinct_days = len({r[1].date() for r in rows})
         m = _median(xs)
         return Baseline(
             route=route,
@@ -59,6 +62,7 @@ class PostgresStore(PriceStore):
             sample_size=len(xs),
             p10=_percentile(xs, 0.10),
             p05=_percentile(xs, 0.05),
+            distinct_days=distinct_days,
         )
 
     def seen_deal(self, key):
@@ -119,6 +123,15 @@ class PostgresStore(PriceStore):
             dct["route"] = {"origin": dct.pop("origin"), "destination": dct.pop("destination")}
             out.append(dct)
         return out
+
+    def prune(self, days: int = 95) -> int:
+        """刪除 days 天前的舊報價，避免 prices 表無限增長撞 Supabase 免費額度。"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "delete from prices where observed_at < now() - make_interval(days => %s)",
+                (days,),
+            )
+            return cur.rowcount
 
     def close(self):
         try:

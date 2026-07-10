@@ -25,3 +25,15 @@ jobs:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
         run: python main.py run -c config.prod.yaml
+      - name: 失敗告警（設 ALERT_WEBHOOK secret 後生效；未設時 GitHub 仍會 email 通知排程失敗）
+        if: failure()
+        env:
+          ALERT_WEBHOOK: ${{ secrets.ALERT_WEBHOOK }}
+        run: |
+          if [ -n "$ALERT_WEBHOOK" ]; then
+            curl -fsS -X POST -H 'Content-Type: application/json' \
+              -d "{\"content\":\"抓票排程失敗：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+              "$ALERT_WEBHOOK" || true
+          else
+            echo "未設定 ALERT_WEBHOOK，略過 webhook 告警"
+          fi

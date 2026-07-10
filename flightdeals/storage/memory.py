@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from ..models import Baseline, FarePrice, Route
@@ -16,19 +16,22 @@ class InMemoryStore(PriceStore):
     name = "memory"
 
     def __init__(self):
-        self._prices: dict[Route, list[float]] = defaultdict(list)
+        self._prices: dict[Route, list[tuple[float, datetime]]] = defaultdict(list)
         self._seen: set[str] = set()
         self._deals: list[dict] = []
         self._deal_id = 0
 
     def add_prices(self, prices):
         for p in prices:
-            self._prices[p.route].append(p.price)
+            self._prices[p.route].append((p.price, p.observed_at))
 
     def baseline(self, route, window_days=90):
-        xs = self._prices.get(route, [])
-        if len(xs) < 20:
+        cutoff = datetime.utcnow() - timedelta(days=window_days)
+        rows = [(price, obs) for price, obs in self._prices.get(route, []) if obs >= cutoff]
+        if len(rows) < 50:
             return None
+        xs = [price for price, _ in rows]
+        distinct_days = len({obs.date() for _, obs in rows})
         med = _median(xs)
         return Baseline(
             route=route,
@@ -37,7 +40,17 @@ class InMemoryStore(PriceStore):
             sample_size=len(xs),
             p10=_percentile(xs, 0.10),
             p05=_percentile(xs, 0.05),
+            distinct_days=distinct_days,
         )
+
+    def prune(self, days: int = 95) -> int:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        removed = 0
+        for route, rows in self._prices.items():
+            kept = [(price, obs) for price, obs in rows if obs >= cutoff]
+            removed += len(rows) - len(kept)
+            self._prices[route] = kept
+        return removed
 
     def seen_deal(self, key):
         return key in self._seen

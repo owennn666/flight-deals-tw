@@ -54,11 +54,14 @@ class Baseline:
     currency: str = "TWD"
     p10: float = 0.0            # 第 10 百分位價格（歷史地板附近）
     p05: float = 0.0            # 第 5 百分位價格（極端歷史低價）
+    distinct_days: int = 0      # 樣本橫跨的不同曆日數
 
     @property
     def is_reliable(self) -> bool:
-        """樣本太少的基準線不可信；分位數統計需要更多樣本才有意義。"""
-        return self.sample_size >= 20
+        """樣本太少、或全擠在同一兩天內的基準線不可信：
+        分位數統計需要足夠樣本數，且要橫跨夠多曆日才叫「比平常便宜」，
+        不然「平常」只是同一天內的價格抖動。"""
+        return self.sample_size >= 50 and self.distinct_days >= 7
 
 
 class DealType(str, Enum):
@@ -80,7 +83,15 @@ class Deal:
     reasons: list[str] = field(default_factory=list)
 
     def dedupe_key(self) -> str:
-        """去重鍵：同票種、同航線、同出發日、同價位只推一次。"""
+        """去重鍵：同票種、同航線、同出發/回程日、同來源網站、同百元價位只推一次。
+
+        價格用百元桶（round(price, -2)）而非整數四捨五入，避免 1 元的價格
+        抖動被當成新 deal；同時納入 gate 與 return_date，避免不同訂票網站
+        或不同回程日的同價 deal 被誤判成重複而吞掉。
+        """
         f = self.fare
         d = f.depart_date.isoformat() if f.depart_date else "-"
-        return f"{self.deal_type.value}|{f.route}|{d}|{round(f.price)}"
+        ret = f.return_date.isoformat() if f.return_date else "-"
+        gate = f.gate or "-"
+        bucket = int(round(f.price, -2))
+        return f"{self.deal_type.value}|{f.route}|{d}|{ret}|{gate}|{bucket}"

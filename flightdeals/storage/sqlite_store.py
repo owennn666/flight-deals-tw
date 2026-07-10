@@ -10,6 +10,7 @@ from typing import Optional
 from ..models import Baseline, FarePrice, Route
 from ..stats import mad as _mad
 from ..stats import median as _median
+from ..stats import percentile as _percentile
 from .base import PriceStore
 
 
@@ -66,14 +67,24 @@ class SQLiteStore(PriceStore):
     def baseline(self, route, window_days=90):
         since = (datetime.utcnow() - timedelta(days=window_days)).isoformat()
         rows = self._conn().execute(
-            "SELECT price FROM prices WHERE origin=? AND destination=? AND observed_at>=?",
+            "SELECT price, observed_at FROM prices WHERE origin=? AND destination=? AND observed_at>=?",
             (route.origin, route.destination, since),
         ).fetchall()
-        prices = [r[0] for r in rows]
-        if len(prices) < 3:
+        if len(rows) < 50:
             return None
+        prices = [r[0] for r in rows]
+        # observed_at 存的是 ISO 字串（可能含或不含時間），前 10 碼即為曆日 YYYY-MM-DD。
+        distinct_days = len({r[1][:10] for r in rows})
         med = _median(prices)
-        return Baseline(route=route, median=med, mad=_mad(prices, med), sample_size=len(prices))
+        return Baseline(
+            route=route,
+            median=med,
+            mad=_mad(prices, med),
+            sample_size=len(prices),
+            p10=_percentile(prices, 0.10),
+            p05=_percentile(prices, 0.05),
+            distinct_days=distinct_days,
+        )
 
     def seen_deal(self, key):
         return self._conn().execute(
@@ -114,6 +125,13 @@ class SQLiteStore(PriceStore):
             d["created_at"] = created
             out.append(d)
         return out
+
+    def prune(self, days: int = 95) -> int:
+        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        c = self._conn()
+        cur = c.execute("DELETE FROM prices WHERE observed_at < ?", (cutoff,))
+        c.commit()
+        return cur.rowcount
 
     def close(self):
         conn = getattr(self._local, "conn", None)

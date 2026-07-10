@@ -5,8 +5,8 @@ from flightdeals.models import Baseline, Cabin, FarePrice, Route
 R = Route("TPE", "LHR")
 
 
-def _baseline(median=30000, mad=2500, n=30):
-    return Baseline(route=R, median=median, mad=mad, sample_size=n)
+def _baseline(median=30000, mad=2500, n=60, days=8):
+    return Baseline(route=R, median=median, mad=mad, sample_size=n, distinct_days=days)
 
 
 def test_extreme_low_price_flagged():

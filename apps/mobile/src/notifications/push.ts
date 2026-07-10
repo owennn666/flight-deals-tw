@@ -12,13 +12,42 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// 裝置識別：優先用 Expo push token；拿不到（模擬器）就用隨機 id。
-// 註：scaffold 版存在記憶體，重開 App 會變；正式版請用 expo-secure-store 持久化。
+// 裝置識別：與 push token 脫鉤（token 拿不到、使用者拒絕通知權限，一樣要能回穩定 id）。
+// Web：用 localStorage 持久化的 UUID，重新整理不會變。
+// 原生：目前仍存記憶體（重開 App 會變；正式版請用 expo-secure-store 持久化）。
+const DEVICE_ID_KEY = "fd_device_id";
 let cachedDeviceId: string | null = null;
 
-export function getDeviceId(): string {
+function generateUuidV4(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // 沒有 crypto.randomUUID（舊瀏覽器 / RN 環境）→ 手工湊一個 v4 格式的 id
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function hasLocalStorage(): boolean {
+  return Platform.OS === "web" && typeof localStorage !== "undefined";
+}
+
+export function getOrCreateDeviceId(): string {
+  if (hasLocalStorage()) {
+    try {
+      const stored = localStorage.getItem(DEVICE_ID_KEY);
+      if (stored) return stored;
+      const created = generateUuidV4();
+      localStorage.setItem(DEVICE_ID_KEY, created);
+      return created;
+    } catch {
+      // localStorage 不可用（例如無痕模式擋存取）→ 退化為記憶體 id
+    }
+  }
   if (!cachedDeviceId) {
-    cachedDeviceId = "dev-" + Math.random().toString(36).slice(2, 10);
+    cachedDeviceId = "dev-" + generateUuidV4();
   }
   return cachedDeviceId;
 }
@@ -40,15 +69,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     });
   }
 
-  const projectId =
-    (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.eas &&
-    ((Constants.expoConfig?.extra as { eas?: { projectId?: string } }).eas?.projectId);
+  const eas = Constants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
+  const projectId = eas?.projectId;
 
   const tokenResp = await Notifications.getExpoPushTokenAsync(
     projectId ? { projectId } : undefined
   );
   const token = tokenResp.data;
-  cachedDeviceId = token;
 
   try {
     await api.registerDevice(token, Platform.OS);

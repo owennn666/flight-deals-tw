@@ -1,17 +1,35 @@
 """端到端：pipeline 用記憶體儲存 + mock 資料源，驗證偵測與去重。"""
+import random
 from datetime import date
 
 from flightdeals.detectors.cheap import CheapFareDetector
 from flightdeals.detectors.errorfare import ErrorFareDetector
 from flightdeals.ingest.base import DataSource
-from flightdeals.ingest.mock import MockDataSource
+from flightdeals.ingest.mock import DEFAULT_BASELINES, MockDataSource
 from flightdeals.models import Cabin, FarePrice, Route
 from flightdeals.notify.base import Notifier
 from flightdeals.pipeline import Pipeline
-from flightdeals.seed import seed_history
 from flightdeals.storage.memory import InMemoryStore
+from tests._helpers import multi_day_prices
 
 ROUTES = [Route("TPE", "NRT"), Route("TPE", "LHR")]
+
+
+def _seed_reliable_history(store, routes, n=60, days=8, rng_seed=1):
+    """跟 flightdeals.seed.seed_history 邏輯相同（同樣的基準價 + 抖動範圍），
+    但把 observed_at 分散到 days 個不同曆日；seed_history 本身只在單一時間點
+    寫入、全部落在同一天，滿足不了新的可靠基準線門檻
+    （sample_size>=50 且 distinct_days>=7），所以測試改用這個 helper。"""
+    rng = random.Random(rng_seed)
+    base_map = {Route(*k): v for k, v in DEFAULT_BASELINES.items()}
+    total = 0
+    for route in routes:
+        base = base_map.get(route, 15000)
+        prices = [round(base * (1 + rng.uniform(-0.12, 0.15))) for _ in range(n)]
+        batch = multi_day_prices(route, prices, days=days)
+        store.add_prices(batch)
+        total += len(batch)
+    return total
 
 
 class CaptureNotifier(Notifier):
@@ -38,7 +56,7 @@ class FixedSource(DataSource):
 
 def _pipe(force):
     store = InMemoryStore()
-    seed_history(store, ROUTES)
+    _seed_reliable_history(store, ROUTES)
     cap = CaptureNotifier()
     pipe = Pipeline(
         sources=[MockDataSource(seed=1, force=force)],
@@ -65,7 +83,7 @@ def test_forced_error_triggers_verification_deal():
 def test_dedup_no_duplicate_alerts():
     # 用固定報價，兩次 run 得到相同的好康 → 第二次應被去重
     store = InMemoryStore()
-    seed_history(store, ROUTES)
+    _seed_reliable_history(store, ROUTES)
     cap = CaptureNotifier()
     fixed = FixedSource(
         [FarePrice(route=Route("TPE", "NRT"), price=6000,

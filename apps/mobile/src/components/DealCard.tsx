@@ -2,6 +2,7 @@ import React from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Deal } from "../api/types";
 import { AIRLINE_NAMES } from "../api/client";
+import { timeAgo } from "../utils/timeAgo";
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -33,9 +34,10 @@ export default function DealCard({ deal, onPress }: { deal: Deal; onPress: () =>
   const route = deal.route_str.replace("->", " → ");
   const pct = Math.round(deal.discount_pct * 100);
   const median = Math.round(deal.baseline_median).toLocaleString();
+  const found = deal.created_at ? timeAgo(deal.created_at) : null;
   const hint = isBug
-    ? `比平常低 ${pct}% · 航司不保證出票，訂票風險自負`
-    : `這條航線平常約 ${median}${deal.tier === "strong" ? " · 難得低價" : ""}${deal.gate ? ` · 經 ${deal.gate} 訂` : ""}`;
+    ? `比平常低 ${pct}% · 航司不保證出票，訂票風險自負${found ? ` · ${found}發現` : ""}`
+    : `這條航線平常約 ${median}${deal.tier === "strong" ? " · 難得低價" : ""}${deal.gate ? ` · 經 ${deal.gate} 訂` : ""}${found ? ` · ${found}發現` : ""}`;
   const isTrip = deal.gate === "Trip.com" || !deal.gate;
   const buttonLabel = isBug
     ? (isTrip ? "前往 Trip.com 查看 ↗" : "前往 Aviasales 查看 ↗")

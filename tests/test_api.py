@@ -12,13 +12,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from flightdeals.api.app import create_app  # noqa: E402
 from flightdeals.detectors.cheap import CheapFareDetector  # noqa: E402
-from flightdeals.ingest.mock import MockDataSource  # noqa: E402
+from flightdeals.ingest.mock import DEFAULT_BASELINES, MockDataSource  # noqa: E402
 from flightdeals.models import Route  # noqa: E402
 from flightdeals.notify.repository import RepositoryNotifier  # noqa: E402
 from flightdeals.pipeline import Pipeline  # noqa: E402
-from flightdeals.seed import seed_history  # noqa: E402
 from flightdeals.storage.memory import InMemoryStore  # noqa: E402
 from flightdeals.subscribers import InMemorySubscriberRepo  # noqa: E402
+
+from tests._helpers import multi_day_prices  # noqa: E402
 
 
 def _client(store=None):
@@ -27,10 +28,24 @@ def _client(store=None):
                                  subscribers=InMemorySubscriberRepo()))
 
 
+def _seed_reliable_history(store, routes, n=60, days=8, rng_seed=1):
+    """同 tests/test_pipeline.py 的作法：可靠基準線門檻改成
+    sample_size>=50 且 distinct_days>=7，seed_history 只在單一時間點寫入
+    （全部同一天）滿足不了，這裡改用橫跨多天的合成歷史。"""
+    import random
+
+    rng = random.Random(rng_seed)
+    base_map = {Route(*k): v for k, v in DEFAULT_BASELINES.items()}
+    for route in routes:
+        base = base_map.get(route, 15000)
+        prices = [round(base * (1 + rng.uniform(-0.12, 0.15))) for _ in range(n)]
+        store.add_prices(multi_day_prices(route, prices, days=days))
+
+
 def _store_with_deals():
     store = InMemoryStore()
     routes = [Route("TPE", "NRT")]
-    seed_history(store, routes)
+    _seed_reliable_history(store, routes)
     Pipeline(
         [MockDataSource(seed=1, force="cheap")],
         store,

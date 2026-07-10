@@ -1,15 +1,12 @@
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import React from "react";
+import { ScrollView, StyleSheet, Text } from "react-native";
 
 export default function SettingsScreen() {
-  const [push, setPush] = useState(true);
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.h}>設定</Text>
-      <View style={styles.row}>
-        <Text style={styles.label}>接收好康推播</Text>
-        <Switch value={push} onValueChange={setPush} />
-      </View>
+      {/* 推播開關先隱藏：後端目前沒有任何程式讀訂閱表送推播，這顆開關切了沒有實際效果，
+          顯示出來等於做假承諾。等推播真的上線再打開。 */}
 
       <Text style={styles.section}>關於</Text>
       <Text style={styles.p}>
