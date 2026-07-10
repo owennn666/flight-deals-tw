@@ -40,7 +40,8 @@ def build_pipeline(cfg) -> Pipeline:
     detectors = [DETECTORS[d["name"]](**d.get("params", {})) for d in cfg["detectors"]]
     notifiers = [NOTIFIERS[n["name"]](**n.get("params", {})) for n in cfg["notifiers"]]
     notifiers.append(RepositoryNotifier(store))  # 好康持久化，供 FastAPI /deals 讀取
-    return Pipeline(sources, store, detectors, notifiers)
+    window_days = cfg.get("window_days", 90)
+    return Pipeline(sources, store, detectors, notifiers, window_days=window_days)
 
 
 def cmd_demo(_args) -> None:
@@ -74,10 +75,12 @@ def cmd_seed(args) -> None:
 def cmd_run(args) -> None:
     cfg = load_config(args.config)
     pipe = build_pipeline(cfg)
-    deals = pipe.run_once(_routes(cfg))
-    pruned = pipe.store.prune()
-    print(f"[run] 清理 {pruned} 筆 95 天前舊價")
-    pipe.close()
+    try:
+        deals = pipe.run_once(_routes(cfg))
+        pruned = pipe.store.prune()
+        print(f"[run] 清理 {pruned} 筆 95 天前舊價")
+    finally:
+        pipe.close()
     print(f"\n[run] 本輪偵測到 {len(deals)} 筆好康（已存入 DB，API /deals 可讀）。")
 
 

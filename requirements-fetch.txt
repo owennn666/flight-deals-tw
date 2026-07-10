@@ -1,0 +1,5 @@
+# 抓票排程（GitHub Actions fetch.yml）真正需要的依賴，只含頂層套件。
+# 完整依賴（含 fastapi/uvicorn/pytest 等）見 requirements.txt，本機/測試用。
+
+pyyaml>=6.0            # 讀 config.prod.yaml
+psycopg[binary]>=3.1   # 寫入 Supabase（Postgres）

@@ -74,20 +74,26 @@ export interface DealsQuery {
   minDiscount?: number;
   maxPrice?: number;
   limit?: number;
+  offset?: number;
+  signal?: AbortSignal;
 }
 
 export const api = {
   routes: async (): Promise<RouteInfo[]> => ROUTES,
 
   deals: async (opts?: DealsQuery): Promise<Deal[]> => {
-    const { type, origin, destination, minDiscount, maxPrice, limit = 50 } = opts ?? {};
-    let filter = "";
+    const { type, origin, destination, minDiscount, maxPrice, limit = 50, offset = 0, signal } = opts ?? {};
+    // 只顯示能標示來源（gate）的 deal：舊的未標源 deal 與無法歸戶的報價都不顯示（下推到 query 層，取代前端過濾）
+    let filter = "&gate=not.is.null";
     if (type) filter += `&type=eq.${encodeURIComponent(type)}`;
     if (origin) filter += `&origin=eq.${encodeURIComponent(origin)}`;
     if (destination) filter += `&destination=eq.${encodeURIComponent(destination)}`;
     if (minDiscount !== undefined) filter += `&discount_pct=gte.${minDiscount}`;
     if (maxPrice !== undefined) filter += `&price=lte.${maxPrice}`;
-    const rows = await rest<DealRow[]>(`/deals?select=*&order=id.desc&limit=${limit}${filter}`);
+    const rows = await rest<DealRow[]>(
+      `/deals?select=*&order=id.desc&limit=${limit}&offset=${offset}${filter}`,
+      signal ? { signal } : undefined
+    );
     return (rows ?? []).map(toDeal);
   },
 

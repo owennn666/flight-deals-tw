@@ -1,5 +1,6 @@
 """Travelpayouts v3 資料源解析測試（注入假回應，不觸網）。"""
 from datetime import date
+from urllib.parse import urlsplit
 
 from flightdeals.ingest.travelpayouts import TravelpayoutsSource
 from flightdeals.models import Route
@@ -111,3 +112,46 @@ def test_missing_token_raises():
         assert False, "應該要因缺 token 而拋錯"
     except RuntimeError as e:
         assert "TRAVELPAYOUTS_TOKEN" in str(e)
+
+
+def _host(url: str) -> str:
+    return urlsplit(url).netloc
+
+
+def test_aviasales_link_rejects_protocol_relative_authority_injection():
+    """第三方 link 若是 "//evil.com/x"（protocol-relative），不能讓最終網址的
+    網域跑到 evil.com（authority injection）。"""
+    src = TravelpayoutsSource(token="t")
+    url = src._aviasales_link("//evil.com/x", Route("TPE", "NRT"), date(2026, 9, 1))
+    assert _host(url) == "www.aviasales.com"
+    assert "evil.com" not in _host(url)
+
+
+def test_aviasales_link_rejects_userinfo_authority_injection():
+    """第三方 link 若含 "@evil.com"（userinfo 混淆），不能讓最終網址的網域跑到
+    evil.com（authority injection）。"""
+    src = TravelpayoutsSource(token="t")
+    url = src._aviasales_link("/search/..@evil.com", Route("TPE", "NRT"), date(2026, 9, 1))
+    assert _host(url) == "www.aviasales.com"
+    assert "evil.com" not in _host(url)
+
+
+def test_aviasales_link_accepts_normal_relative_path():
+    """正常的相對路徑（沒有 payload）應照舊被採用，不會被誤判成不合法而 fallback。"""
+    src = TravelpayoutsSource(token="t")
+    url = src._aviasales_link("/search/TPE1509NRT2809", Route("TPE", "NRT"), date(2026, 9, 1))
+    assert url == "https://www.aviasales.com/search/TPE1509NRT2809"
+
+
+def test_aviasales_link_rejects_no_leading_slash_authority_injection():
+    """第三方 link 若不是以 / 開頭、且含 @（如 "@evil.com"），直接字串接在網域後面
+    會讓 urlsplit 把 "www.aviasales.com@evil.com" 解析成 host=evil.com（userinfo
+    混淆的 authority injection）。這是三個測試裡唯一一個「不修就真的會炸」的案例：
+    另外兩個 task 指定的 payload（//evil.com/x、/search/..@evil.com）就算不修，
+    因為字串接法恰好在 @ 之前先出現 /，urlsplit 仍會把 netloc 停在
+    www.aviasales.com——但不能因為這兩個巧合安全就不修，這裡用真正會被
+    naive 字串接法攻破的 payload 驗證修法確實生效。"""
+    src = TravelpayoutsSource(token="t")
+    url = src._aviasales_link("@evil.com/x", Route("TPE", "NRT"), date(2026, 9, 1))
+    assert _host(url) == "www.aviasales.com"
+    assert "evil.com" not in _host(url)

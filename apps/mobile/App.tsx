@@ -1,5 +1,9 @@
 import React, { useEffect } from "react";
-import { NavigationContainer, createNavigationContainerRef } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+  type NavigatorScreenParams,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
@@ -18,8 +22,15 @@ export type DealsStackParamList = {
   DealDetail: { deal: Deal };
 };
 
+// 最外層 Tab 導覽的型別（給 navigationRef 用，涵蓋巢狀的 DealsStack）
+export type RootTabParamList = {
+  Deals: NavigatorScreenParams<DealsStackParamList>;
+  Subscriptions: undefined;
+  Settings: undefined;
+};
+
 // 讓「通知點擊」這種畫面外的事件也能導航
-export const navigationRef = createNavigationContainerRef();
+export const navigationRef = createNavigationContainerRef<RootTabParamList>();
 
 const Stack = createNativeStackNavigator<DealsStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -36,10 +47,7 @@ function DealsStack() {
 // 推播的 data 欄位帶了整筆 deal → 點通知直接跳詳情，不必再打 API
 function openDealFromNotification(data: unknown) {
   if (!data || typeof data !== "object" || !navigationRef.isReady()) return;
-  navigationRef.navigate(
-    "Deals" as never,
-    { screen: "DealDetail", params: { deal: data as Deal } } as never
-  );
+  navigationRef.navigate("Deals", { screen: "DealDetail", params: { deal: data as Deal } });
 }
 
 export default function App() {

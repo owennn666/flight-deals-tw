@@ -4,11 +4,21 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import type { DealsStackParamList } from "../../App";
 import { timeAgo } from "../utils/timeAgo";
+import { dateLine, flightInfoLine } from "../utils/dealFormat";
 
 type Props = NativeStackScreenProps<DealsStackParamList, "DealDetail">;
 
 export default function DealDetailScreen({ route }: Props) {
   const { deal } = route.params;
+  const isBug = deal.type === "error_fare";
+  const dates = dateLine(deal);
+  const flightInfo = flightInfoLine(deal);
+  // 按鈕文字依 gate 分流，與 DealCard 一致
+  const isTrip = deal.gate === "Trip.com" || !deal.gate;
+  const buttonLabel = isBug
+    ? (isTrip ? "前往 Trip.com 查看 ↗" : "前往 Aviasales 查看 ↗")
+    : (isTrip ? "前往 Trip.com 訂票 ↗" : "前往 Aviasales 比價 ↗");
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.route}>{deal.route_str}</Text>
@@ -17,9 +27,11 @@ export default function DealDetailScreen({ route }: Props) {
       </Text>
       <Text style={styles.sub}>
         基準 {Math.round(deal.baseline_median).toLocaleString()} · 省{" "}
-        {Math.round(deal.discount_pct * 100)}% · {deal.tier}
+        {Math.round(deal.discount_pct * 100)}%{deal.tier === "strong" ? " · 難得低價" : ""}
       </Text>
-      {deal.depart_date ? <Text style={styles.sub}>出發：{deal.depart_date}</Text> : null}
+      {dates ? <Text style={styles.sub}>{dates}</Text> : null}
+      {flightInfo ? <Text style={styles.sub}>✈ {flightInfo}</Text> : null}
+      {deal.gate ? <Text style={styles.sub}>經 {deal.gate} 訂</Text> : null}
       {deal.created_at ? <Text style={styles.sub}>{timeAgo(deal.created_at)}發現</Text> : null}
 
       <View style={styles.reasons}>
@@ -40,7 +52,7 @@ export default function DealDetailScreen({ route }: Props) {
 
       {deal.deep_link ? (
         <Pressable style={styles.button} onPress={() => Linking.openURL(deal.deep_link as string)}>
-          <Text style={styles.buttonText}>前往訂票（外部網站）</Text>
+          <Text style={styles.buttonText}>{buttonLabel}</Text>
         </Pressable>
       ) : null}
 

@@ -172,9 +172,23 @@ class TravelpayoutsSource(DataSource):
         優先用 API 回傳的 link（去掉會 15 分鐘過期的 t= token query）；
         沒有 link 時退而用航線/日期自組搜尋路徑；都沒有就導首頁。
         有設 marker（聯盟）則附加在最後。
+
+        第三方（Travelpayouts）回傳的 link 不可信，不能直接接到
+        "https://www.aviasales.com" 後面：先用 urlsplit 只取其 path，並限定
+        必須是「單一 / 開頭、不含 @、不以 // 開頭」的相對路徑，避免
+        //evil.com 或 user@evil.com 這類 payload 讓最終網址的網域跑掉
+        （authority injection）。不合法就退回既有的自組路徑 fallback。
         """
+        path = None
         if link:
-            path = link.split("?")[0]
+            candidate = urllib.parse.urlsplit(link.split("?")[0]).path
+            if (
+                candidate.startswith("/")
+                and not candidate.startswith("//")
+                and "@" not in candidate
+            ):
+                path = candidate
+        if path is not None:
             url = f"https://www.aviasales.com{path}"
         elif depart is not None:
             ddmm = f"{depart.day:02d}{depart.month:02d}"

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -33,11 +33,15 @@ const DISCOUNT_OPTIONS: { key: number | undefined; label: string }[] = [
 
 // 航線清單固定放在 client.ts 的 ROUTES；這裡透過 api.routes() 讀（同一份資料）
 const ROUTE_ALL = "__all__";
+const PAGE_SIZE = 50;
+const MAX_PRICE_DEBOUNCE_MS = 300;
 
 export default function DealsScreen({ navigation }: Props) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,48 +49,92 @@ export default function DealsScreen({ navigation }: Props) {
   const [routeKey, setRouteKey] = useState<string>(ROUTE_ALL);
   const [minDiscount, setMinDiscount] = useState<number | undefined>(undefined);
   const [maxPriceInput, setMaxPriceInput] = useState<string>("");
+  const [debouncedMaxPriceInput, setDebouncedMaxPriceInput] = useState<string>("");
   const [hideLcc, setHideLcc] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // 分頁游標與進行中請求：用 ref 而非 state，避免分頁推進時把 load 的 identity 一起變動（見下方 fetchPage 依賴）
+  const offsetRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     api.routes().then(setRoutes).catch(() => {});
   }, []);
 
-  const maxPrice = useMemo(() => {
-    const n = Number(maxPriceInput);
-    return maxPriceInput.trim() !== "" && !Number.isNaN(n) && n > 0 ? n : undefined;
+  // 價格上限輸入 debounce 300ms 再生效，避免每個按鍵都打一次 API
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMaxPriceInput(maxPriceInput), MAX_PRICE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
   }, [maxPriceInput]);
+
+  const maxPrice = useMemo(() => {
+    const n = Number(debouncedMaxPriceInput);
+    return debouncedMaxPriceInput.trim() !== "" && Number.isFinite(n) && n > 0 ? n : undefined;
+  }, [debouncedMaxPriceInput]);
 
   const selectedRoute = useMemo(
     () => routes.find((r) => `${r.origin}-${r.destination}` === routeKey),
     [routes, routeKey]
   );
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      const rows = await api.deals({
-        type: filter,
-        origin: selectedRoute?.origin,
-        destination: selectedRoute?.destination,
-        minDiscount,
-        maxPrice,
-      });
-      // 只顯示能標示來源（gate）的 deal：舊的未標源 deal 與無法歸戶的報價都不顯示
-      const attributed = rows.filter((d) => d.gate);
-      setDeals(hideLcc ? attributed.filter((d) => !d.airline || !LCC_AIRLINES.includes(d.airline)) : attributed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "載入失敗");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [filter, selectedRoute, minDiscount, maxPrice, hideLcc]);
+  // 抓一頁資料；append=false 時取代既有列表（篩選變更/下拉重整），append=true 時接在後面（分頁載入）
+  const fetchPage = useCallback(
+    async (pageOffset: number, append: boolean) => {
+      // 發新請求前中止前一個未完成的請求，防止舊請求慢回來蓋掉新結果（競態）
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
+      if (append) setLoadingMore(true);
+      try {
+        setError(null);
+        const rows = await api.deals({
+          type: filter,
+          origin: selectedRoute?.origin,
+          destination: selectedRoute?.destination,
+          minDiscount,
+          maxPrice,
+          offset: pageOffset,
+          limit: PAGE_SIZE,
+          signal: controller.signal,
+        });
+        const filtered = hideLcc
+          ? rows.filter((d) => !d.airline || !LCC_AIRLINES.includes(d.airline))
+          : rows;
+        setDeals((prev) => (append ? [...prev, ...filtered] : filtered));
+        offsetRef.current = pageOffset + rows.length;
+        setHasMore(rows.length === PAGE_SIZE);
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return; // 被更新的請求取代，不算錯誤
+        setError(e instanceof Error ? e.message : "載入失敗");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [filter, selectedRoute, minDiscount, maxPrice, hideLcc]
+  );
+
+  // 篩選條件（含 debounce 後的價格上限）變更時：offset 歸零、清空舊資料重新載入
   useEffect(() => {
+    offsetRef.current = 0;
+    setHasMore(true);
     setLoading(true);
-    load();
-  }, [load]);
+    fetchPage(0, false);
+  }, [fetchPage]);
+
+  const onRefresh = useCallback(() => {
+    offsetRef.current = 0;
+    setHasMore(true);
+    setRefreshing(true);
+    fetchPage(0, false);
+  }, [fetchPage]);
+
+  const onEndReached = useCallback(() => {
+    if (loading || loadingMore || refreshing || !hasMore) return;
+    fetchPage(offsetRef.current, true);
+  }, [fetchPage, loading, loadingMore, refreshing, hasMore]);
 
   const activeChips: { label: string; onClear: () => void }[] = [];
   if (selectedRoute) activeChips.push({ label: selectedRoute.label, onClear: () => setRouteKey(ROUTE_ALL) });
@@ -100,6 +148,16 @@ export default function DealsScreen({ navigation }: Props) {
     activeChips.push({ label: `價格≤${maxPrice.toLocaleString()}`, onClear: () => setMaxPriceInput("") });
   }
   if (hideLcc) activeChips.push({ label: "已隱藏廉航", onClear: () => setHideLcc(false) });
+
+  // 空清單文案：BUG 票分頁優先用專屬文案；其餘依「是否有生效的篩選」分兩種
+  let emptyText: string;
+  if (filter === "error_fare") {
+    emptyText = "BUG 票（疑似標錯價）非常罕見，出現時會列在這裡並附風險提示。目前沒有進行中的 BUG 票。";
+  } else if (activeChips.length > 0) {
+    emptyText = "沒有符合篩選的好康，試著放寬條件";
+  } else {
+    emptyText = "目前沒有進行中的好康，資料每 15 分鐘更新";
+  }
 
   return (
     <View style={styles.container}>
@@ -182,16 +240,11 @@ export default function DealsScreen({ navigation }: Props) {
             <DealCard deal={item} onPress={() => navigation.navigate("DealDetail", { deal: item })} />
           )}
           contentContainerStyle={{ paddingVertical: 8 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                load();
-              }}
-            />
-          }
-          ListEmptyComponent={<Text style={styles.empty}>目前沒有好康，下拉刷新看看。</Text>}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ marginVertical: 16 }} /> : null}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListEmptyComponent={<Text style={styles.empty}>{emptyText}</Text>}
         />
       )}
     </View>
